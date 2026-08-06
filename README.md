@@ -11,6 +11,8 @@ property editor inside an Atlas six-region dockable workspace, and provides
 six-direction alignment (left / horizontal-center / right / top /
 vertical-center / bottom) for circle, rectangle, and triangle primitives.
 
+> **Live demo:** https://wubing7755.github.io/Penelopa/
+
 ## Features
 
 - Atlas six-region dockable workspace with top toolbar and status bar
