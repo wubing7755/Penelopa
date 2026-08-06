@@ -10,9 +10,11 @@ logic is layered so each concern is independently testable.
 
 ```text
 src/Penelopa (WASM app)
-  ├── Components/PenelopaWorkspace.razor   Atlas dockable four-pane layout
+  ├── Components/PenelopaWorkspace.razor   Atlas six-region dockable layout
+  ├── Components/PenelopaTopToolbar.razor  Hosted in the Atlas top toolbar slot
+  ├── Components/PenelopaStatusBar.razor   Hosted in the Atlas status bar slot
   ├── Components/Panels/                   Tools / PrimitiveTree / Canvas / Properties
-  └── wwwroot/css/app.css                  Editor shell styles + height chain
+  └── wwwroot/css/app.css                  Editor shell styles + Gundam theme
 src/Penelopa.Rendering                     SkiaSharp canvas + color-key hit testing
 src/Penelopa.Core                          Primitive model + alignment algorithms
 ```
@@ -40,25 +42,32 @@ Pure domain logic with no UI or SkiaSharp dependency:
 SkiaSharp rendering extracted so hit-testing logic can be unit tested without
 a browser:
 
-- `CanvasRenderer` owns a 512x512 draw bitmap and an off-screen hit bitmap.
+- `CanvasRenderer` owns a draw bitmap and an off-screen hit bitmap sized to
+  the target canvas (`EnsureBuffersFor` rebuilds them when the canvas
+  `DeviceClipBounds` changes, so the editor canvas fills its host panel).
   `Render` clears both, applies the y-flip world transform
-  (`Translate(0, 512)` + `Scale(1, -1)`), paints every primitive (visible
+  (`Translate(0, height)` + `Scale(1, -1)`), paints every primitive (visible
   color on the draw bitmap, color key on the hit bitmap), then blits the
   result and draws the axis indicator.
 - `HitTest(screenX, screenY)` reads the hit bitmap pixel and resolves the
   color key back to a primitive. Screen coordinates are the browser's
   top-left origin; the y-flip means a world point `(x, y)` renders at screen
-  `(x, 512 - y)`.
+  `(x, height - y)`. Coordinates outside the bitmap return null.
 
 ### Penelopa (WASM app)
 
-- `PenelopaWorkspace.razor` declares the Atlas layout: a left tool strip
-  (Tools + Primitives), a central document group (Diagram), and a right tool
-  group (Properties). Panels receive the Atlas content context through the
-  `AtlasContentComponent` base class.
-- `CanvasPanel.razor` hosts the `SKGLView` (512x512, `EnableRenderLoop=true`)
-  and wires `OnPaintSurface` → `CanvasRenderer.Render`, plus `mousedown` →
-  `HitTest` → selection (Ctrl-click appends).
+- `PenelopaWorkspace.razor` declares the Atlas layout as a six-region
+  workspace: an inline-start dock (Tools + Primitives over an empty lower
+  slot), a central document group (Diagram), an inline-end dock (Properties
+  over an empty lower slot), and a block-end dock with two empty slots. The
+  left and right docks start at 300px each so the side panels are symmetric;
+  the four empty groups stay collapsed and only keep their toolbar slots.
+  `PenelopaTopToolbar` and `PenelopaStatusBar` are supplied through the
+  `TopToolbarContent` / `StatusBarContent` host slots.
+- `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
+  `IgnorePixelScaling=true`, fills the panel) and wires `OnPaintSurface` →
+  `CanvasRenderer.Render`, plus `mousedown` → `HitTest` → selection
+  (Ctrl-click appends).
 - `ToolPanel.razor` exposes Add (Circle/Rectangle/Triangle) and Align
   (six directions) actions.
 - `PrimitiveTreePanel.razor` lists all primitives; clicking selects.
@@ -69,7 +78,8 @@ a browser:
 
 Atlas workspaces are sized by their parent; the editor shell must chain
 `html/body/#app/.penelopa-main/.penelopa-shell/.atlas-v2-workspace` to 100%
-height (see `wwwroot/css/app.css`).
+height (see `wwwroot/css/app.css`). The top toolbar and status bar render
+inside the Atlas host, above and below the work area.
 
 ## Alignment Semantics
 
@@ -95,6 +105,13 @@ two items returns false without moving.
   RazorSourceGenerator incremental-input bug for net6.0 WASM, so the version
   is pinned.
 - SkiaSharp is pinned to 2.88.9: the 4.x line's
-  `SkiaSharp.NativeAssets.WebAssembly.targets` requires net8.0+.
+  `SkiaSharp.NativeAssets.WebAssembly.targets` requires net8.0+. The
+  `SkiaSharp.NativeAssets.Linux` package is referenced explicitly because
+  2.88.9 only pulls Win32/macOS native assets transitively; without it the
+  Linux CI tests fail with `DllNotFoundException: libSkiaSharp`.
 - The `wasm-tools` workload is required to link the SkiaSharp native assets
   into the WASM build; CI installs it before restore.
+- `NuGet.Config` maps every package to nuget.org
+  (`packageSourceMapping`) so central package management (CPM) does not trip
+  NU1507 on GitHub Actions runners, which add a default `library-packs`
+  source.

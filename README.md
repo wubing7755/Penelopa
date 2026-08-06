@@ -1,32 +1,39 @@
 # Penelopa
 
+English | [简体中文](README.zh.md)
+
 **A primitive alignment editor for Blazor WebAssembly.**
 
 Penelopa is an independent consumer of the
 [Atlas.Blazor](https://www.nuget.org/packages/Atlas.Blazor) NuGet package. It
 hosts a SkiaSharp drawing canvas, a primitive tree, alignment actions, and a
-property editor inside an Atlas dockable workspace, and provides six-direction
-alignment (left / horizontal-center / right / top / vertical-center / bottom)
-for circle, rectangle, and triangle primitives.
+property editor inside an Atlas six-region dockable workspace, and provides
+six-direction alignment (left / horizontal-center / right / top /
+vertical-center / bottom) for circle, rectangle, and triangle primitives.
 
 ## Features
 
-- Atlas dockable workspace layout (tool panels, split views, drag-and-drop)
-- SkiaSharp canvas with color-key hit testing
+- Atlas six-region dockable workspace with top toolbar and status bar
+- Symmetric side docks (300px each) around a full-height drawing canvas
+- SkiaSharp canvas with color-key hit testing (canvas resizes with its panel)
 - Circle / Rectangle / Triangle primitives with an editable property system
 - Six-direction alignment against the union bounding box, with idempotence
 - Property editor driven by the primitive property model
+- Gundam-themed light/dark skin driven by `--penelopa-*` CSS variables
 
 ## Project Structure
 
-```text
-Penelopa.sln
-src/Penelopa/            Blazor WebAssembly app consuming Atlas.Blazor 0.2.0
-src/Penelopa.Core/       Primitive model and alignment algorithms (no UI deps)
-src/Penelopa.Rendering/  SkiaSharp canvas rendering and hit testing
-docs/                    Documentation
-tests/                   xUnit test projects (Core, Rendering)
-```
+| Project | Responsibility |
+|---------|----------------|
+| `src/Penelopa` | Blazor WebAssembly app consuming `Atlas.Blazor` 0.2.0 |
+| `src/Penelopa.Core` | UI-independent primitive model and alignment algorithms |
+| `src/Penelopa.Rendering` | SkiaSharp canvas rendering and hit testing |
+| `tests/` | xUnit test projects for Core and Rendering |
+
+`Penelopa.Core` does not depend on Blazor or SkiaSharp. Browser input on the
+canvas is converted into a hit test against the color-key buffer, committed
+through the shared primitive service, and projected back by Blazor into the
+panels.
 
 ## Development
 
@@ -48,6 +55,19 @@ dotnet test Penelopa.sln --no-build --no-restore
 dotnet format Penelopa.sln --verify-no-changes --no-restore
 ```
 
+Run the app:
+
+```sh
+dotnet run --project src/Penelopa
+```
+
+## Documentation
+
+| Document | Content |
+|----------|---------|
+| [Architecture (en)](docs/en/architecture.md) | Layers, rendering, alignment semantics, toolchain notes |
+| [架构 (zh)](docs/zh/architecture.md) | 分层、渲染、对齐语义、工具链说明 |
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Penelopa is released under the [MIT License](LICENSE).
