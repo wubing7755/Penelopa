@@ -1,0 +1,74 @@
+@namespace Penelopa.Components
+@using Atlas.Blazor.Content
+@using Penelopa.Core.Primitives
+@using Penelopa.Core.Services
+@inherits AtlasContentComponent
+@implements IDisposable
+
+<div class="penelopa-tree">
+    @if (_primitives.Count == 0)
+    {
+        <p class="penelopa-tree-empty">No primitives yet. Add one from the Tools panel.</p>
+    }
+    else
+    {
+        <ul class="penelopa-tree-list">
+            @foreach (var primitive in _primitives)
+            {
+                <li>
+                    <button type="button"
+                            class="penelopa-tree-item @(IsSelected(primitive) ? "selected" : "")"
+                            @onclick="() => Select(primitive)">
+                        @primitive.Name.Value
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private readonly List<Primitive> _primitives = new();
+
+    [Inject]
+    private IPrimitiveService PrimitiveService { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        PrimitiveService.OnChange += HandleChange;
+        PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
+        RefreshList();
+    }
+
+    private void HandleChange(Primitive primitive)
+    {
+        RefreshList();
+        StateHasChanged();
+    }
+
+    private void HandleSelectionChanged(IEnumerable<Primitive> primitives)
+    {
+        StateHasChanged();
+    }
+
+    private void RefreshList()
+    {
+        _primitives.Clear();
+        _primitives.AddRange(PrimitiveService.GetAll());
+    }
+
+    private bool IsSelected(Primitive primitive)
+        => PrimitiveService.GetSelection().Contains(primitive);
+
+    private void Select(Primitive primitive)
+    {
+        PrimitiveService.SetSelected(primitive);
+    }
+
+    public void Dispose()
+    {
+        PrimitiveService.OnChange -= HandleChange;
+        PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
+    }
+}

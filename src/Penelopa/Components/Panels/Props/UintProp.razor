@@ -1,0 +1,12 @@
+@namespace Penelopa.Components.Panels.Props
+@using Penelopa.Core.Primitives
+
+<div class="form-group mb-2">
+    <label class="form-label">@PropValue.Name</label>
+    <input type="number" class="form-control" @bind="PropValue.Value" min="0" />
+</div>
+
+@code {
+    [Parameter]
+    public UintPropValue PropValue { get; set; } = null!;
+}

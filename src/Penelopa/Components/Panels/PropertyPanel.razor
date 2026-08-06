@@ -1,0 +1,65 @@
+@namespace Penelopa.Components
+@using Atlas.Blazor.Content
+@using Penelopa.Core.Primitives
+@using Penelopa.Core.Services
+@using Penelopa.Components.Panels.Props
+@inherits AtlasContentComponent
+@implements IDisposable
+
+<div class="penelopa-properties">
+    @if (_targetPrimitive is null)
+    {
+        <p class="penelopa-properties-empty">Select a primitive to view its properties.</p>
+    }
+    else
+    {
+        <div class="penelopa-properties-title">@_targetPrimitive.Name.Value</div>
+        @foreach (var prop in _targetPrimitive.Props)
+        {
+            <div class="penelopa-properties-item">
+                @switch (prop)
+                {
+                    case FloatPropValue fpv:
+                        <FloatProp PropValue="fpv" />
+                        break;
+                    case DoublePropValue dpv:
+                        <DoubleProp PropValue="dpv" />
+                        break;
+                    case IntPropValue ipv:
+                        <IntProp PropValue="ipv" />
+                        break;
+                    case BoolPropValue bpv:
+                        <BoolProp PropValue="bpv" />
+                        break;
+                    case UintPropValue upv:
+                        <UintProp PropValue="upv" />
+                        break;
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private Primitive? _targetPrimitive;
+
+    [Inject]
+    private IPrimitiveService PrimitiveService { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
+    }
+
+    private void HandleSelectionChanged(IEnumerable<Primitive> primitives)
+    {
+        _targetPrimitive = primitives.FirstOrDefault();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
+    }
+}

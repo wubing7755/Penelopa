@@ -1,0 +1,12 @@
+@namespace Penelopa.Components.Panels.Props
+@using Penelopa.Core.Primitives
+
+<div class="form-group mb-2">
+    <label class="form-label">@PropValue.Name</label>
+    <input type="number" step="any" class="form-control" @bind="PropValue.Value" />
+</div>
+
+@code {
+    [Parameter]
+    public FloatPropValue PropValue { get; set; } = null!;
+}

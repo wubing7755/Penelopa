@@ -1,0 +1,15 @@
+@namespace Penelopa.Components.Panels.Props
+@using Penelopa.Core.Primitives
+
+<div class="form-group mb-2">
+    <label class="form-label">@PropValue.Name</label>
+    <select class="form-control" @bind="PropValue.Value">
+        <option value="true">True</option>
+        <option value="false">False</option>
+    </select>
+</div>
+
+@code {
+    [Parameter]
+    public BoolPropValue PropValue { get; set; } = null!;
+}

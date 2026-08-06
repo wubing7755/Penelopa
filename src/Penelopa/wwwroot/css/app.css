@@ -1,0 +1,483 @@
+@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+
+/* ============================================================
+   Penelopa — art-studio skin with light/dark themes.
+   Warm paper background, charcoal ink, and a magenta accent.
+   The whole palette is driven by --penelopa-* variables: :root
+   defines the light palette, and @media (prefers-color-scheme:
+   dark) swaps in a dark variant. Atlas chrome that the variable
+   contract covers (ADR-0023 / REQ-NF-009) is themed through
+   --atlas-* overrides; effect-layer styling (borders, radii,
+   shadows) stays in consumer selectors below.
+   ============================================================ */
+
+/* ---- 1. Layout skeleton ---- */
+
+html,
+body,
+#app,
+.penelopa-main,
+.penelopa-shell,
+.penelopa-shell > .atlas-v2-workspace {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body {
+    min-width: 20rem;
+    background: var(--penelopa-bg);
+}
+
+button {
+    font: inherit;
+}
+
+h1:focus {
+    outline: none;
+}
+
+#blazor-error-ui {
+    display: none;
+}
+
+/* ---- 2. Penelopa palette ---- */
+
+:root {
+    color-scheme: light dark;
+    font-family: "Segoe UI", "Candara", "Trebuchet MS", sans-serif;
+
+    /* Palette — light (RX-78-2 Gundam: white / red / blue / yellow) */
+    --penelopa-bg: #f0f2f5;
+    --penelopa-surface: #ffffff;
+    --penelopa-chrome: #ffcc00;
+    --penelopa-chrome-ink: #1f1f1f;
+    --penelopa-accent: #d0021b;
+    --penelopa-accent-ink: #ffffff;
+    --penelopa-blue: #0042a5;
+    --penelopa-green: #1e8e4e;
+    --penelopa-ink: #1f1f1f;
+    --penelopa-muted: #6b7280;
+    --penelopa-border: #1f1f1f;
+    --penelopa-hover: #ffd9d9;
+    --penelopa-selection: #cfe0ff;
+    background: var(--penelopa-bg);
+    color: var(--penelopa-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* Palette — dark (night-battle Gundam) */
+        --penelopa-bg: #14161a;
+        --penelopa-surface: #1e2126;
+        --penelopa-chrome: #c9a500;
+        --penelopa-chrome-ink: #141414;
+        --penelopa-accent: #ff3b4d;
+        --penelopa-accent-ink: #ffffff;
+        --penelopa-blue: #3d7bd9;
+        --penelopa-green: #3fae6c;
+        --penelopa-ink: #e6e9ee;
+        --penelopa-muted: #8b93a1;
+        --penelopa-border: #05070a;
+        --penelopa-hover: #4a2a2e;
+        --penelopa-selection: #27415e;
+        background: var(--penelopa-bg);
+        color: var(--penelopa-ink);
+    }
+}
+
+/* ---- 3. Atlas variable contract overrides ---- */
+
+.penelopa-shell .atlas-v2-workspace {
+    --atlas-accent: var(--penelopa-accent);
+    --atlas-surface: var(--penelopa-surface);
+    --atlas-text: var(--penelopa-ink);
+    --atlas-splitter-size: 0.4rem;
+    --atlas-splitter-hit-area: 0.3rem;
+    --atlas-chrome-height: 2.5rem;
+    --atlas-gap: 0.5rem;
+    --atlas-padding-compact: 0.5rem 0.75rem;
+    --atlas-radius: 0.75rem;
+    --atlas-radius-sm: 0.5rem;
+    --atlas-border-width: 2px;
+    --atlas-focus-ring-width: 3px;
+    --atlas-splitter-opacity: 0.9;
+    --atlas-splitter-opacity-hover: 1;
+    --atlas-splitter-opacity-focus: 1;
+    --atlas-drop-highlight-alpha-soft: 18%;
+    --atlas-drop-highlight-alpha-strong: 28%;
+    --atlas-toolbar-divider-opacity: 0.4;
+    --atlas-drag-preview-opacity: 0.98;
+    /* Chrome tokens (ADR-0023 extension) */
+    --atlas-group-bg: var(--penelopa-surface);
+    --atlas-chrome-bg: var(--penelopa-chrome);
+    --atlas-tab-text: var(--penelopa-chrome-ink);
+    --atlas-tab-text-active: var(--penelopa-accent);
+    --atlas-tab-bg-active: var(--penelopa-surface);
+    --atlas-tab-bg-hover: var(--penelopa-hover);
+    --atlas-splitter-color: var(--penelopa-blue);
+    background: var(--penelopa-bg);
+    color: var(--penelopa-ink);
+}
+
+/* ---- 4. Atlas chrome effect layer ---- */
+
+.penelopa-shell .atlas-v2-work-area,
+.penelopa-shell .atlas-v2-split,
+.penelopa-shell .atlas-v2-group,
+.penelopa-shell .atlas-v2-content-stack,
+.penelopa-shell .atlas-v2-content-outlet {
+    min-width: 0;
+    min-height: 0;
+}
+
+.penelopa-shell .atlas-v2-group {
+    border: 2px solid var(--penelopa-border);
+    border-radius: var(--atlas-radius, 0.75rem);
+    box-shadow: 0 0.3rem 0 color-mix(in srgb, var(--penelopa-ink) 18%, transparent);
+    margin: 0.15rem;
+}
+
+.penelopa-shell .atlas-v2-splitter {
+    border-radius: 0.3rem;
+    box-shadow: 0 0 0 2px var(--penelopa-bg);
+}
+
+.penelopa-shell .atlas-v2-panel-header,
+.penelopa-shell .atlas-v2-tab-strip {
+    min-height: 2.5rem;
+    align-items: center;
+    border-bottom: 2px solid var(--penelopa-border);
+    border-radius: 0.6rem 0.6rem 0 0;
+    user-select: none;
+}
+
+.penelopa-shell .atlas-v2-panel-header {
+    padding: 0 0.75rem;
+    font-weight: 700;
+}
+
+.penelopa-shell .atlas-v2-tab-strip {
+    padding-inline: 0.4rem;
+    gap: 0.15rem;
+}
+
+.penelopa-shell .atlas-v2-tab-strip [role="tab"] {
+    min-height: 2.4rem;
+    max-width: 13rem;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 0.5rem 0.5rem 0 0;
+    padding: 0.25rem 0.8rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.penelopa-shell .atlas-v2-tab-strip [role="tab"][aria-selected="true"] {
+    border-color: var(--penelopa-border);
+    border-bottom-color: var(--atlas-tab-bg-active);
+    box-shadow: 0 0.25rem 0 var(--penelopa-accent);
+}
+
+.penelopa-shell .atlas-v2-toolbar {
+    width: 2.75rem;
+    height: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    padding: 0.3rem 0;
+    border-inline: 2px solid var(--penelopa-border);
+}
+
+.penelopa-shell .atlas-v2-toolbar-region {
+    width: 100%;
+}
+
+.penelopa-shell .atlas-v2-toolbar button {
+    width: 1.9rem;
+    min-height: 2.7rem;
+    margin: 0.12rem auto;
+    overflow: hidden;
+    border: 0;
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    background: transparent;
+    color: var(--penelopa-chrome-ink);
+    font-weight: 700;
+    writing-mode: vertical-rl;
+}
+
+.penelopa-shell .atlas-v2-toolbar button:hover,
+.penelopa-shell .atlas-v2-toolbar button[aria-selected="true"] {
+    background: var(--penelopa-surface);
+    color: var(--penelopa-accent);
+    box-shadow: 0 0.15rem 0 var(--penelopa-border);
+}
+
+/* ---- 5. Penelopa top toolbar / status bar ---- */
+
+.penelopa-topbar {
+    min-height: 2.65rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 0.6rem;
+    background: var(--penelopa-accent);
+    border-bottom: 3px solid var(--penelopa-border);
+    color: var(--penelopa-accent-ink);
+}
+
+.penelopa-product {
+    width: 5.75rem;
+    height: 1.75rem;
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 2px solid var(--penelopa-border);
+    border-radius: 0.45rem;
+    background: linear-gradient(135deg, var(--penelopa-chrome), var(--penelopa-green) 48%, var(--penelopa-blue));
+    color: var(--penelopa-chrome-ink);
+    font-weight: 900;
+    box-shadow: 0 0.15rem 0 color-mix(in srgb, var(--penelopa-ink) 50%, transparent);
+}
+
+.penelopa-menu,
+.penelopa-runner {
+    display: flex;
+    align-items: center;
+    gap: 0.12rem;
+}
+
+.penelopa-menu button,
+.penelopa-runner button {
+    border: 2px solid transparent;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.55rem;
+    background: transparent;
+    color: var(--penelopa-accent-ink);
+    font-weight: 700;
+}
+
+.penelopa-menu button:hover,
+.penelopa-runner button:hover {
+    background: color-mix(in srgb, var(--penelopa-accent) 80%, black);
+    border-color: var(--penelopa-border);
+}
+
+.penelopa-runner {
+    margin-inline-start: auto;
+}
+
+.penelopa-branch {
+    color: color-mix(in srgb, var(--penelopa-accent-ink) 75%, transparent);
+    margin-inline-end: 0.35rem;
+}
+
+.penelopa-target {
+    min-width: 8.5rem;
+    text-align: start;
+    background: var(--penelopa-surface) !important;
+    border-color: var(--penelopa-border) !important;
+    color: var(--penelopa-ink) !important;
+}
+
+.penelopa-run {
+    color: var(--penelopa-chrome) !important;
+}
+
+.penelopa-statusbar {
+    min-height: 1.55rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0 0.65rem;
+    background: var(--penelopa-chrome);
+    border-top: 2px solid var(--penelopa-border);
+    color: var(--penelopa-chrome-ink);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.penelopa-status-spacer {
+    flex: 1;
+}
+
+.penelopa-ok {
+    color: var(--penelopa-green);
+}
+
+/* ---- 6. Penelopa content panels ---- */
+
+.penelopa-tools,
+.penelopa-tree,
+.penelopa-properties {
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: auto;
+    padding: 0.75rem;
+    background: var(--penelopa-surface);
+    color: var(--penelopa-ink);
+    font-size: 0.85rem;
+}
+
+.penelopa-tools h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1rem;
+    color: var(--penelopa-ink);
+}
+
+.penelopa-tool-section {
+    margin-bottom: 1rem;
+}
+
+.penelopa-tool-label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--penelopa-muted);
+    margin-bottom: 0.35rem;
+}
+
+.penelopa-tool-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.penelopa-tool-button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: var(--penelopa-chrome);
+    border: 2px solid var(--penelopa-border);
+    border-radius: 0.5rem;
+    color: var(--penelopa-chrome-ink);
+    box-shadow: 0 0.15rem 0 color-mix(in srgb, var(--penelopa-ink) 40%, transparent);
+}
+
+.penelopa-tool-button:hover {
+    background: var(--penelopa-blue);
+    color: #fff;
+}
+
+.penelopa-tool-button:active {
+    box-shadow: none;
+    transform: translateY(0.1rem);
+}
+
+.penelopa-tree-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.penelopa-tree-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.3rem 0.6rem;
+    margin-bottom: 0.2rem;
+    border: 2px solid transparent;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--penelopa-ink);
+    cursor: pointer;
+}
+
+.penelopa-tree-item:hover {
+    background: var(--penelopa-hover);
+}
+
+.penelopa-tree-item.selected {
+    background: var(--penelopa-selection);
+    color: var(--penelopa-ink);
+    border-color: var(--penelopa-border);
+}
+
+.penelopa-tree-empty,
+.penelopa-properties-empty {
+    color: var(--penelopa-muted);
+}
+
+.penelopa-properties-title {
+    font-weight: 800;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--penelopa-border);
+}
+
+.penelopa-properties-item {
+    margin-bottom: 0.6rem;
+}
+
+.penelopa-properties .form-label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--penelopa-muted);
+    margin-bottom: 0.25rem;
+}
+
+.penelopa-properties .form-control {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.35rem 0.55rem;
+    border: 2px solid var(--penelopa-border);
+    border-radius: 0.45rem;
+    background: var(--penelopa-surface);
+    color: var(--penelopa-ink);
+    font: inherit;
+}
+
+.penelopa-properties .form-control:focus {
+    outline: var(--atlas-focus-ring-width, 3px) solid var(--penelopa-accent);
+    outline-offset: 1px;
+}
+
+.penelopa-canvas {
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    background: var(--penelopa-surface);
+}
+
+.penelopa-canvas canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    box-sizing: border-box;
+    background: #000;
+    border: 2px solid var(--penelopa-border);
+    border-radius: var(--atlas-radius, 0.75rem);
+    box-shadow: 0 0.3rem 0 color-mix(in srgb, var(--penelopa-ink) 18%, transparent);
+}
+
+/* ---- 7. Bootstrap leftovers (default template rules) ---- */
+
+a,
+.btn-link {
+    color: var(--penelopa-accent);
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid var(--penelopa-green);
+}
+
+.invalid {
+    outline: 1px solid var(--penelopa-accent);
+}
+
+.validation-message {
+    color: var(--penelopa-accent);
+}

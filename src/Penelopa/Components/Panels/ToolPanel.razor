@@ -1,0 +1,47 @@
+@namespace Penelopa.Components
+@using Atlas.Blazor.Content
+@using Penelopa.Core.Alignment
+@using Penelopa.Core.Primitives
+@using Penelopa.Core.Services
+@inherits AtlasContentComponent
+
+<div class="penelopa-tools">
+    <h3>Tools</h3>
+
+    <div class="penelopa-tool-section">
+        <span class="penelopa-tool-label">Add</span>
+        <div class="penelopa-tool-actions">
+            <button type="button" class="penelopa-tool-button" @onclick="() => Add(() => new Circle())">Circle</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Add(() => new Rectangle())">Rectangle</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Add(() => new Triangle())">Triangle</button>
+        </div>
+    </div>
+
+    <div class="penelopa-tool-section">
+        <span class="penelopa-tool-label">Align</span>
+        <div class="penelopa-tool-actions">
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.Left)">&#8592; Left</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.HCenter)">&#8596; H-Center</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.Right)">&#8594; Right</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.Top)">&#8593; Top</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.VCenter)">&#8597; V-Center</button>
+            <button type="button" class="penelopa-tool-button" @onclick="() => Align(AlignType.Bottom)">&#8595; Bottom</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Inject]
+    private IPrimitiveService PrimitiveService { get; set; } = null!;
+
+    private void Add(Func<Primitive> factory)
+    {
+        PrimitiveService.Add(factory());
+    }
+
+    private void Align(AlignType type)
+    {
+        var selection = PrimitiveService.GetSelection();
+        AlignExtensions.Align<Primitive>(selection, type);
+    }
+}
