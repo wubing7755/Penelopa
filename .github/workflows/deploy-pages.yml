@@ -1,0 +1,54 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+
+      # Penelopa links the SkiaSharp native assets into dotnet.wasm, so the
+      # wasm-tools workload is required (unlike Atlas.Demo, which has no
+      # native dependencies).
+      - name: Install wasm-tools workload
+        run: dotnet workload install wasm-tools
+
+      - name: Publish Penelopa
+        run: |
+          dotnet publish src/Penelopa/Penelopa.csproj \
+            --configuration Release \
+            --output publish/site \
+            --source https://api.nuget.org/v3/index.json
+
+      # GitHub Pages project site maps the deployed artifact root to the
+      # /Penelopa/ subpath. The dev index.html keeps base href="/" so local
+      # `dotnet run` works; the deployed copy must resolve assets from
+      # /Penelopa/.
+      - name: Rewrite base href for the /Penelopa/ subpath
+        run: |
+          sed -i 's|<base href="/" />|<base href="/Penelopa/" />|' publish/site/wwwroot/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publish/site/wwwroot
+
+      - uses: actions/deploy-pages@v4
+        id: deployment
