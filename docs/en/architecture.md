@@ -48,7 +48,10 @@ a browser:
   Both bitmaps share one `ViewTransform` (y-flip world transform scaled by
   the device pixel ratio); `Render` clears both, paints every primitive
   (visible color on the draw bitmap, color key on the hit bitmap), then
-  blits the result and draws the axis indicator.
+  blits the result, draws the axis indicator, and draws the selection
+  overlay (bounding box plus four corner handles at a fixed 8px screen
+  size). The hit buffer is drawn without antialiasing so 1px edges stay
+  hittable.
 - `ViewTransform` maps world coordinates (model space, Y up) to view pixels
   (Y down) at physical resolution: one world unit equals one CSS pixel, so
   the render target is `devicePixelRatio` times the CSS size. It is the
@@ -80,15 +83,36 @@ a browser:
   with no selected item.
 - `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
   physical-resolution rendering via the default `IgnorePixelScaling=false`)
-  inside a scrollable content box (`.penelopa-canvas-scroll` with a minimum
+  inside a scrollable content box (`.penelopa-canvas-scroll` + minimum
   content size), so shrinking the window shows scrollbars instead of
   clipping the drawing area. It wires `OnPaintSurface` →
   `CanvasRenderer.Render` with the event's `e.Info` size and the current
   `devicePixelRatio`, plus `mousedown` → `HitTest` → selection (Ctrl-click
-  appends). Browser `OffsetX/Y` are relative to the canvas element, so
-  scrolling does not affect hit testing. A small JS helper
-  (`wwwroot/js/penelopa.js`) watches `devicePixelRatio` changes (matchMedia)
-  so moves across displays with different DPI stay in sync.
+  appends). A small JS helper (`wwwroot/js/penelopa.js`) watches
+  `devicePixelRatio` changes (matchMedia) so moves across displays with
+  different DPI stay in sync, and hosts the pointer layer (capture,
+  canvas-relative CSS coordinates, synthesized-mouse suppression, rAF
+  throttling) that reports semantic callbacks into the interaction
+  controller. Browser `OffsetX/Y` are relative to the canvas element, so
+  scrolling does not affect hit testing.
+
+### Interaction
+
+Editing gestures run through `EditorInteractionController` in Core — a
+small state machine (Idle / Pressed / Dragging / Resizing) that receives
+world-space pointer positions and a layered `HitTestResult`, snapshots
+the selection and geometry at pointer-down, and notifies panels once on
+commit. ESC, pointer-cancel, lost capture, or window blur restores the
+snapshot and returns to Idle. Clicking an already-selected member of a
+multi-selection defers the decision until pointer-up, so the same gesture
+either collapses the selection (click) or drags the group; Ctrl-click
+toggles membership. Resize keeps the corner opposite the dragged handle
+fixed (`ResizeMath`, with a minimum size and mirror-flip when crossing
+the fixed corner), and primitives fit themselves to the target bounds
+through `SetBounds(bounds, anchor)`: circles keep their aspect with the
+fixed corner on the boundary, triangles map their vertices by normalized
+position. Future hit-through (drill-down) will collect candidates with
+`ContainsWorldPoint` plus ancestor chains.
 - `ToolPanel.razor` exposes Add (Circle/Rectangle/Triangle) and Align
   (six directions) actions.
 - `PrimitiveTreePanel.razor` lists all primitives; clicking selects.

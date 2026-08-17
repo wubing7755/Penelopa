@@ -8,6 +8,7 @@ namespace Penelopa.Core.Services;
 public interface IPrimitiveService
 {
     void Add(Primitive primitive);
+    void Remove(Primitive primitive);
     IEnumerable<Primitive> GetAll();
     void SetSelected(Primitive primitive);
     void SetSelectedRange(IEnumerable<Primitive> primitives);
@@ -15,6 +16,11 @@ public interface IPrimitiveService
     void ClearSelection();
     IEnumerable<Primitive> GetSelection();
 
+    /// <summary>Announces that the given primitives' geometry changed.</summary>
+    void NotifyPrimitivesChanged(IEnumerable<Primitive> primitives);
+
     event Action<Primitive>? OnChange;
+    event Action? OnCollectionChanged;
     event Action<IEnumerable<Primitive>>? OnSelectionChanged;
+    event Action<IEnumerable<Primitive>>? OnPrimitiveChanged;
 }

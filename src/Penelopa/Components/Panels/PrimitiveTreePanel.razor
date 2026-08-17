@@ -37,11 +37,18 @@
     {
         base.OnInitialized();
         PrimitiveService.OnChange += HandleChange;
+        PrimitiveService.OnCollectionChanged += HandleCollectionChanged;
         PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
         RefreshList();
     }
 
     private void HandleChange(Primitive primitive)
+    {
+        RefreshList();
+        StateHasChanged();
+    }
+
+    private void HandleCollectionChanged()
     {
         RefreshList();
         StateHasChanged();
@@ -69,6 +76,7 @@
     public void Dispose()
     {
         PrimitiveService.OnChange -= HandleChange;
+        PrimitiveService.OnCollectionChanged -= HandleCollectionChanged;
         PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
     }
 }

@@ -1,3 +1,5 @@
+using Penelopa.Core.Alignment;
+using Penelopa.Core.Interaction;
 using Penelopa.Core.Primitives;
 using SkiaSharp;
 
@@ -58,17 +60,21 @@ public sealed class CanvasRenderer
     /// <param name="devicePixelRatio">The CSS-to-physical pixel ratio
     /// (<c>window.devicePixelRatio</c>).</param>
     /// <param name="primitives">The primitives to draw.</param>
+    /// <param name="selection">The current selection; when non-empty, a
+    /// selection box (and corner handles for a single item) is drawn on top.</param>
     public void Render(
         SKCanvas canvas,
         SKImageInfo info,
         float devicePixelRatio,
-        IReadOnlyList<Primitive> primitives)
+        IReadOnlyList<Primitive> primitives,
+        IReadOnlyList<Primitive>? selection = null)
     {
         EnsureBuffersFor(info.Width, info.Height, devicePixelRatio);
         canvas.Clear(SKColors.Black);
         DrawPrimitives(primitives);
         canvas.DrawBitmap(_drawBitmap, 0, 0);
         DrawCoordinateSystem(canvas);
+        DrawSelectionOverlay(canvas, selection);
     }
 
     /// <summary>
@@ -129,6 +135,165 @@ public sealed class CanvasRenderer
         return ColorKeyManager.TryGetPrimitive(colorKey, out var primitive) ? primitive : null;
     }
 
+    /// <summary>
+    /// Tests whether a CSS screen point hits one of the selection box's
+    /// corner handles, in screen space. Handles are fixed-size screen
+    /// elements, so the test uses CSS pixels independent of world scale.
+    /// </summary>
+    public ResizeHandle? HitTestHandles(float screenCssX, float screenCssY, Box worldBounds)
+    {
+        const float hitRadiusCss = 5f;
+        foreach (var handle in SelectionBox.AllHandles)
+        {
+            var screen = ToCss(SelectionBox.HandlePoint(worldBounds, handle));
+            if (MathF.Abs(screen.X - screenCssX) <= hitRadiusCss
+                && MathF.Abs(screen.Y - screenCssY) <= hitRadiusCss)
+            {
+                return handle;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Tests whether a CSS screen point lies inside the world bounds projected
+    /// to screen space (the multi-selection union box, used as a group-drag
+    /// handle).
+    /// </summary>
+    public bool HitTestUnionBox(float screenCssX, float screenCssY, Box worldBounds)
+    {
+        var topLeft = ToCss(new Point(worldBounds.MinX, worldBounds.MaxY));
+        var bottomRight = ToCss(new Point(worldBounds.MaxX, worldBounds.MinY));
+        return screenCssX >= topLeft.X && screenCssX <= bottomRight.X
+            && screenCssY >= topLeft.Y && screenCssY <= bottomRight.Y;
+    }
+
+    /// <summary>
+    /// Runs the layered hit test for the interaction layer: corner handle
+    /// (single selection), then primitive color key, then the multi-selection
+    /// union box.
+    /// </summary>
+    public HitTestResult HitTestSelection(float screenCssX, float screenCssY, IReadOnlyList<Primitive> selection)
+    {
+        if (selection.Count == 1)
+        {
+            var bounds = selection[0].GetWorldBoundingBox();
+            var handle = HitTestHandles(screenCssX, screenCssY, bounds);
+            if (handle is not null)
+            {
+                return new HitTestResult { Handle = handle, Primitive = selection[0] };
+            }
+        }
+
+        var primitive = HitTest(screenCssX, screenCssY);
+        if (primitive is not null)
+        {
+            return new HitTestResult { Primitive = primitive };
+        }
+
+        if (selection.Count > 1)
+        {
+            return new HitTestResult { InUnionBox = HitTestUnionBox(screenCssX, screenCssY, MergeBounds(selection)) };
+        }
+
+        return default;
+    }
+
+    /// <summary>Converts a CSS screen point to world coordinates.</summary>
+    public Point CssToWorld(float screenCssX, float screenCssY)
+    {
+        var view = _viewTransform.ScreenToView(screenCssX, screenCssY);
+        var world = _viewTransform.ViewToWorld(view.X, view.Y);
+        return new Point(world.X, world.Y);
+    }
+
+    private void DrawSelectionOverlay(SKCanvas canvas, IReadOnlyList<Primitive>? selection)
+    {
+        if (selection is null || selection.Count == 0)
+        {
+            return;
+        }
+
+        canvas.Save();
+        try
+        {
+            // World mode: one world unit equals one CSS pixel, so handles
+            // drawn at HandleSizeCss units are fixed-size on screen.
+            _viewTransform.ApplyTo(canvas);
+
+            if (selection.Count == 1)
+            {
+                DrawSelectionBox(canvas, selection[0].GetWorldBoundingBox(), drawHandles: true);
+            }
+            else
+            {
+                DrawSelectionBox(canvas, MergeBounds(selection), drawHandles: false);
+            }
+        }
+        finally
+        {
+            canvas.Restore();
+        }
+    }
+
+    private void DrawSelectionBox(SKCanvas canvas, Box bounds, bool drawHandles)
+    {
+        using var outline = new SKPaint
+        {
+            Color = SelectionColor,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.5f,
+            IsAntialias = true,
+        };
+        canvas.DrawRect(new SKRect(bounds.MinX, bounds.MinY, bounds.MaxX, bounds.MaxY), outline);
+
+        if (!drawHandles)
+        {
+            return;
+        }
+
+        using var fill = new SKPaint
+        {
+            Color = SelectionColor,
+            Style = SKPaintStyle.Fill,
+            IsAntialias = true,
+        };
+        foreach (var handle in SelectionBox.AllHandles)
+        {
+            var p = SelectionBox.HandlePoint(bounds, handle);
+            float half = HandleSizeCss / 2f;
+            canvas.DrawRect(
+                new SKRect(p.X - half, p.Y - half, p.X + half, p.Y + half),
+                fill);
+        }
+    }
+
+    private static Box MergeBounds(IReadOnlyList<Primitive> primitives)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var primitive in primitives)
+        {
+            var box = primitive.GetWorldBoundingBox();
+            minX = MathF.Min(minX, box.MinX);
+            minY = MathF.Min(minY, box.MinY);
+            maxX = MathF.Max(maxX, box.MaxX);
+            maxY = MathF.Max(maxY, box.MaxY);
+        }
+
+        return new Box(minX, minY, maxX, maxY);
+    }
+
+    private SKPoint ToCss(Point world)
+    {
+        var view = _viewTransform.WorldToView(world.X, world.Y);
+        return _viewTransform.ViewToScreen(view.X, view.Y);
+    }
+
+    private const float HandleSizeCss = 8f;
+    private static readonly SKColor SelectionColor = new(0x4D, 0x9F, 0xFF);
+
     private void DrawPrimitives(IReadOnlyList<Primitive> primitives)
     {
         using var canvas = new SKCanvas(_drawBitmap);
@@ -188,7 +353,10 @@ public sealed class CanvasRenderer
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
             Style = SKPaintStyle.Fill,
-            IsAntialias = true,
+            // The hit buffer must stay exact: antialiasing would blend edge
+            // pixels into colors that match no registered key, making 1px
+            // edges unhittable and breaking top-pixel/candidate consistency.
+            IsAntialias = false,
         };
         hitCanvas.DrawCircle(circle.CenterX.Value, circle.CenterY.Value, circle.Radius.Value, paint);
     }
@@ -216,7 +384,7 @@ public sealed class CanvasRenderer
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
             Style = SKPaintStyle.Fill,
-            IsAntialias = true,
+            IsAntialias = false,
         };
         var rect = new SKRect(
             rectangle.PosX.Value,
@@ -249,7 +417,7 @@ public sealed class CanvasRenderer
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
             Style = SKPaintStyle.Fill,
-            IsAntialias = true,
+            IsAntialias = false,
         };
         using var path = new SKPath();
         path.MoveTo(triangle.Vertex1X.Value, triangle.Vertex1Y.Value);

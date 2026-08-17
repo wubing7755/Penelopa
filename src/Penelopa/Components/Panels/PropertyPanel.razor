@@ -14,7 +14,7 @@
     else
     {
         <div class="penelopa-properties-title">@_targetPrimitive.Name.Value</div>
-        @foreach (var prop in _targetPrimitive.Props)
+        @foreach (var prop in _targetPrimitive.Props.Where(p => !ReferenceEquals(p, _targetPrimitive.ColorKey)))
         {
             <div class="penelopa-properties-item">
                 @switch (prop)
@@ -50,6 +50,7 @@
     {
         base.OnInitialized();
         PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
+        PrimitiveService.OnPrimitiveChanged += HandlePrimitiveChanged;
     }
 
     private void HandleSelectionChanged(IEnumerable<Primitive> primitives)
@@ -58,8 +59,15 @@
         StateHasChanged();
     }
 
+    private void HandlePrimitiveChanged(IEnumerable<Primitive> primitives)
+    {
+        // The referenced PropValues already changed; re-render to show them.
+        StateHasChanged();
+    }
+
     public void Dispose()
     {
         PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
+        PrimitiveService.OnPrimitiveChanged -= HandlePrimitiveChanged;
     }
 }

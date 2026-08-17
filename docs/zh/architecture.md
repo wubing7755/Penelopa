@@ -34,7 +34,9 @@ src/Penelopa.Core                          图元模型 + 对齐算法
   渲染目标（`Render` 接收 SKGLView 的 `e.Info` 尺寸，因此画布在任何显示
   DPI 下都填满宿主面板）。两张位图共享同一个 `ViewTransform`（y-flip 世界
   变换并按设备像素比缩放）；`Render` 清空两者，绘制每个图元（可见颜色画到
-  绘制位图、颜色键画到命中位图），然后 blit 结果并绘制坐标轴指示。
+  绘制位图、颜色键画到命中位图），然后 blit 结果、绘制坐标轴指示，再绘制
+  选中覆盖层（包围盒 + 四个角手柄，屏幕固定 8px 大小）。命中位图绘制关闭
+  抗锯齿，保证 1px 边缘可命中。
 - `ViewTransform` 把世界坐标（模型空间，Y 向上）映射到视图像素（Y 向下），
   以物理分辨率渲染：1 个世界单位等于 1 个 CSS 像素，因此渲染目标尺寸为
   CSS 尺寸乘以 `devicePixelRatio`。它是未来缩放/平移的唯一扩展点。
@@ -65,7 +67,21 @@ src/Penelopa.Core                          图元模型 + 对齐算法
   `e.Info` 尺寸与当前 `devicePixelRatio`），以及 `mousedown` → `HitTest` →
   选择（Ctrl 点击追加）。浏览器 `OffsetX/Y` 相对画布元素，滚动不影响命中
   检测。`wwwroot/js/penelopa.js` 用 matchMedia 监听 `devicePixelRatio`
-  变化，跨 DPI 显示器拖动时保持同步。
+  变化，跨 DPI 显示器拖动时保持同步，并承载指针层（捕获、画布相对 CSS
+  坐标、抑制合成鼠标事件、rAF 节流），以语义回调方式上报交互控制器。
+
+### 交互
+
+编辑手势由 Core 层的 `EditorInteractionController` 驱动——一个小的状态机
+（Idle / Pressed / Dragging / Resizing），接收世界坐标指针位置与分层
+`HitTestResult`，在按下时快照选择集与几何，提交时一次性通知各面板。
+ESC、pointer-cancel、捕获丢失或窗口失焦恢复快照并回到 Idle。点击多选
+集合中已选成员时延迟到抬起才做决定：同一手势要么塌缩选择（单击）要么
+拖动整组；Ctrl 点击切换成员资格。缩放保持被拖手柄对角的固定（
+`ResizeMath`，带最小尺寸约束与穿越固定角时的镜像翻转），图元通过
+`SetBounds(bounds, anchor)` 把自身几何拟合到目标包围盒：圆保持正圆且
+固定角在圆上，三角形按归一化位置映射顶点。未来的钻取选择（hit-through）
+将通过 `ContainsWorldPoint` 与祖先链收集候选。
 - `ToolPanel.razor` 提供 Add（Circle/Rectangle/Triangle）与 Align（六方向）操作。
 - `PrimitiveTreePanel.razor` 列出全部图元，点击选择。
 - `PropertyPanel.razor` 通过 `Panels/Props/` 中的类型化输入组件渲染选中图元的 `PropValue` 属性包。

@@ -1,6 +1,7 @@
 @namespace Penelopa.Components
 @using Atlas.Blazor.Content
 @using Microsoft.JSInterop
+@using Penelopa.Core.Interaction
 @using Penelopa.Core.Primitives
 @using Penelopa.Core.Services
 @using Penelopa.Rendering
@@ -8,12 +9,12 @@
 @using SkiaSharp.Views.Blazor
 @inherits AtlasContentComponent
 @implements IDisposable
+@implements IEditorInteractionHost
 
 <div class="penelopa-canvas-scroll">
-    <div class="penelopa-canvas">
+    <div class="penelopa-canvas" @ref="_canvasElement">
         <SKGLView EnableRenderLoop="true"
                   OnPaintSurface="OnPaintSurface"
-                  @onmousedown="HandleMouseDown"
                   style="width: 100%; height: 100%;" />
     </div>
 </div>
@@ -21,8 +22,12 @@
 @code {
     private readonly CanvasRenderer _renderer = new();
     private readonly List<Primitive> _primitives = new();
+    private readonly List<Primitive> _selection = new();
+    private readonly EditorInteractionController _controller;
     private double _dpr = 1;
     private DotNetObjectReference<CanvasPanel>? _dprRef;
+    private ElementReference _canvasElement;
+    private IJSObjectReference? _pointerHandle;
 
     [Inject]
     private IPrimitiveService PrimitiveService { get; set; } = null!;
@@ -30,10 +35,17 @@
     [Inject]
     private IJSRuntime JS { get; set; } = null!;
 
+    public CanvasPanel()
+    {
+        _controller = new EditorInteractionController(this);
+    }
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
         PrimitiveService.OnChange += AddPrimitive;
+        PrimitiveService.OnCollectionChanged += RefreshPrimitives;
+        PrimitiveService.OnSelectionChanged += UpdateSelection;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -43,13 +55,16 @@
             return;
         }
 
-        // The canvas renders at physical resolution (IgnorePixelScaling
-        // defaults to false): one CSS pixel maps to devicePixelRatio physical
-        // pixels. Keep the ratio in sync, including moves across displays
-        // with different DPI.
+        // Physical-resolution rendering: keep the CSS-to-physical ratio in
+        // sync, including moves across displays with different DPI.
         _dpr = await JS.InvokeAsync<double>("penelopa.getDpr");
         _dprRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("penelopa.watchDpr", _dprRef);
+
+        // Pointer layer: capture, canvas-relative CSS coordinates,
+        // synthesized-mouse suppression, rAF-throttled moves.
+        _pointerHandle = await JS.InvokeAsync<IJSObjectReference>(
+            "penelopa.attachPointer", _canvasElement, _dprRef);
     }
 
     [JSInvokable]
@@ -59,43 +74,103 @@
         StateHasChanged();
     }
 
+    [JSInvokable]
+    public void OnPointerDown(double x, double y, double button, bool ctrl, bool shift, long pointerId)
+    {
+        _renderer.SetDevicePixelRatio((float)_dpr);
+        var cssX = (float)x;
+        var cssY = (float)y;
+        var world = _renderer.CssToWorld(cssX, cssY);
+        var hit = _renderer.HitTestSelection(cssX, cssY, PrimitiveService.GetSelection().ToList());
+        _controller.PointerDown(world, hit, ctrl);
+    }
+
+    [JSInvokable]
+    public void OnPointerMove(double x, double y)
+    {
+        var world = _renderer.CssToWorld((float)x, (float)y);
+        _controller.PointerMove(world);
+    }
+
+    [JSInvokable]
+    public void OnPointerUp(double x, double y)
+    {
+        var world = _renderer.CssToWorld((float)x, (float)y);
+        _controller.PointerUp(world);
+    }
+
+    [JSInvokable]
+    public void OnPointerCancel() => _controller.Cancel();
+
+    [JSInvokable]
+    public void OnEscape() => _controller.Cancel();
+
     private void AddPrimitive(Primitive primitive)
     {
         _primitives.Add(primitive);
         StateHasChanged();
     }
 
-    private void OnPaintSurface(SKPaintGLSurfaceEventArgs e)
+    private void RefreshPrimitives()
     {
-        _renderer.Render(e.Surface.Canvas, e.Info, (float)_dpr, _primitives);
+        _primitives.Clear();
+        _primitives.AddRange(PrimitiveService.GetAll());
+        StateHasChanged();
     }
 
-    private void HandleMouseDown(MouseEventArgs e)
+    private void UpdateSelection(IEnumerable<Primitive> primitives)
     {
-        // Browser OffsetX/Y are relative to the SKGLView canvas element (the
-        // scroll container's content), not the viewport: scrolling the canvas
-        // does not change them, so hit testing needs no scroll-offset math.
-        _renderer.SetDevicePixelRatio((float)_dpr);
-        var hit = _renderer.HitTest((float)e.OffsetX, (float)e.OffsetY);
-        if (hit is null)
-        {
-            PrimitiveService.ClearSelection();
-            return;
-        }
+        _selection.Clear();
+        _selection.AddRange(primitives);
+        StateHasChanged();
+    }
 
-        if (e.CtrlKey)
+    private void OnPaintSurface(SKPaintGLSurfaceEventArgs e)
+    {
+        _renderer.Render(e.Surface.Canvas, e.Info, (float)_dpr, _primitives, _selection);
+    }
+
+    IReadOnlyList<Primitive> IEditorInteractionHost.GetSelection()
+        => PrimitiveService.GetSelection().ToList();
+
+    bool IEditorInteractionHost.IsSelected(Primitive primitive)
+        => _selection.Contains(primitive);
+
+    void IEditorInteractionHost.SetSelected(Primitive primitive)
+        => PrimitiveService.SetSelected(primitive);
+
+    void IEditorInteractionHost.AppendSelected(Primitive primitive)
+        => PrimitiveService.AppendSelected(primitive);
+
+    void IEditorInteractionHost.ToggleSelected(Primitive primitive)
+    {
+        if (_selection.Contains(primitive))
         {
-            PrimitiveService.AppendSelected(hit);
+            PrimitiveService.SetSelectedRange(
+                PrimitiveService.GetSelection().Where(p => !ReferenceEquals(p, primitive)));
         }
         else
         {
-            PrimitiveService.SetSelected(hit);
+            PrimitiveService.AppendSelected(primitive);
         }
     }
+
+    void IEditorInteractionHost.ClearSelection()
+        => PrimitiveService.ClearSelection();
+
+    void IEditorInteractionHost.NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)
+        => PrimitiveService.NotifyPrimitivesChanged(primitives);
 
     public void Dispose()
     {
         PrimitiveService.OnChange -= AddPrimitive;
+        PrimitiveService.OnCollectionChanged -= RefreshPrimitives;
+        PrimitiveService.OnSelectionChanged -= UpdateSelection;
+        if (_pointerHandle is not null)
+        {
+            _ = _pointerHandle.DisposeAsync();
+        }
+
         _dprRef?.Dispose();
     }
 }

@@ -449,6 +449,13 @@ h1:focus {
     overflow: auto;
 }
 
+/* While a pointer drag is active, the browser must not hijack the gesture
+   for touch scrolling; the class is toggled from the pointer layer. */
+.penelopa-canvas-scroll.penelopa-dragging,
+.penelopa-canvas.penelopa-dragging {
+    touch-action: none;
+}
+
 /* The canvas keeps a minimum content size so shrinking the window shows
    scrollbars instead of clipping the drawing area. The SKGLView inside
    fills this content box; browser pointer events report OffsetX/Y relative

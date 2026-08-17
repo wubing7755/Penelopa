@@ -16,6 +16,18 @@ public class PrimitiveService : IPrimitiveService
         OnChange?.Invoke(primitive);
     }
 
+    public void Remove(Primitive primitive)
+    {
+        if (!_primitives.Remove(primitive))
+        {
+            return;
+        }
+
+        _selection.Remove(primitive);
+        ColorKeyManager.ReleaseColorKey(primitive.ColorKey.Value);
+        OnCollectionChanged?.Invoke();
+    }
+
     public IEnumerable<Primitive> GetAll()
     {
         return _primitives;
@@ -52,6 +64,11 @@ public class PrimitiveService : IPrimitiveService
 
     public IEnumerable<Primitive> GetSelection() => _selection;
 
+    public void NotifyPrimitivesChanged(IEnumerable<Primitive> primitives)
+        => OnPrimitiveChanged?.Invoke(primitives);
+
     public event Action<Primitive>? OnChange;
+    public event Action? OnCollectionChanged;
     public event Action<IEnumerable<Primitive>>? OnSelectionChanged;
+    public event Action<IEnumerable<Primitive>>? OnPrimitiveChanged;
 }
