@@ -14,7 +14,7 @@ src/Penelopa (WASM app)
   ├── Components/PenelopaTopToolbar.razor  Hosted in the Atlas top toolbar slot
   ├── Components/PenelopaStatusBar.razor   Hosted in the Atlas status bar slot
   ├── Components/Panels/                   Tools / PrimitiveTree / Canvas / Properties
-  └── wwwroot/css/app.css                  Editor shell styles + Gundam theme
+  └── wwwroot/css/app.css                  Editor shell styles + bright studio theme
 src/Penelopa.Rendering                     SkiaSharp canvas + color-key hit testing
 src/Penelopa.Core                          Primitive model + alignment algorithms
 ```

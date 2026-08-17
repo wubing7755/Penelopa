@@ -19,7 +19,7 @@ Penelopa 是 [Atlas.Blazor](https://www.nuget.org/packages/Atlas.Blazor) NuGet
 - 圆形 / 矩形 / 三角形图元与可编辑属性系统
 - 基于整体包围盒的六方向对齐，支持幂等检查
 - 由图元属性模型驱动的属性编辑器
-- 由 `--penelopa-*` CSS 变量驱动的高达主题（亮/暗双模式）
+- 由 `--penelopa-*` CSS 变量驱动的明亮工作室主题（亮/暗双模式）
 
 ## 项目结构
 

@@ -1,14 +1,16 @@
 @import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
 /* ============================================================
-   Penelopa — art-studio skin with light/dark themes.
-   Warm paper background, charcoal ink, and a magenta accent.
-   The whole palette is driven by --penelopa-* variables: :root
-   defines the light palette, and @media (prefers-color-scheme:
-   dark) swaps in a dark variant. Atlas chrome that the variable
-   contract covers (ADR-0023 / REQ-NF-009) is themed through
-   --atlas-* overrides; effect-layer styling (borders, radii,
-   shadows) stays in consumer selectors below.
+   Penelopa — bright studio canvas-editor skin with light/dark
+   themes. Light gray-blue surfaces, a single blue accent, 1px
+   borders and soft shadows so the drawing canvas stays the
+   focal point. The whole palette is driven by --penelopa-*
+   variables: :root defines the light palette, and @media
+   (prefers-color-scheme: dark) swaps in a dark variant. Atlas
+   chrome that the variable contract covers (ADR-0023 /
+   REQ-NF-009) is themed through --atlas-* overrides;
+   effect-layer styling (borders, radii, shadows) stays in
+   consumer selectors below.
    ============================================================ */
 
 /* ---- 1. Layout skeleton ---- */
@@ -48,40 +50,36 @@ h1:focus {
     color-scheme: light dark;
     font-family: "Segoe UI", "Candara", "Trebuchet MS", sans-serif;
 
-    /* Palette — light (RX-78-2 Gundam: white / red / blue / yellow) */
-    --penelopa-bg: #f0f2f5;
+    /* Palette — light (bright studio) */
+    --penelopa-bg: #f2f4f8;
     --penelopa-surface: #ffffff;
-    --penelopa-chrome: #ffcc00;
-    --penelopa-chrome-ink: #1f1f1f;
-    --penelopa-accent: #d0021b;
-    --penelopa-accent-ink: #ffffff;
-    --penelopa-blue: #0042a5;
-    --penelopa-green: #1e8e4e;
-    --penelopa-ink: #1f1f1f;
-    --penelopa-muted: #6b7280;
-    --penelopa-border: #1f1f1f;
-    --penelopa-hover: #ffd9d9;
-    --penelopa-selection: #cfe0ff;
+    --penelopa-chrome: #eef0f4;
+    --penelopa-chrome-ink: #1f2328;
+    --penelopa-accent: #1a73e8;
+    --penelopa-green: #1a7f37;
+    --penelopa-ink: #1f2328;
+    --penelopa-muted: #656d76;
+    --penelopa-border: #d0d7de;
+    --penelopa-hover: #e2e8f0;
+    --penelopa-selection: #d6e4ff;
     background: var(--penelopa-bg);
     color: var(--penelopa-ink);
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        /* Palette — dark (night-battle Gundam) */
-        --penelopa-bg: #14161a;
-        --penelopa-surface: #1e2126;
-        --penelopa-chrome: #c9a500;
-        --penelopa-chrome-ink: #141414;
-        --penelopa-accent: #ff3b4d;
-        --penelopa-accent-ink: #ffffff;
-        --penelopa-blue: #3d7bd9;
-        --penelopa-green: #3fae6c;
-        --penelopa-ink: #e6e9ee;
-        --penelopa-muted: #8b93a1;
-        --penelopa-border: #05070a;
-        --penelopa-hover: #4a2a2e;
-        --penelopa-selection: #27415e;
+        /* Palette — dark (bright studio night) */
+        --penelopa-bg: #1c1d20;
+        --penelopa-surface: #25262a;
+        --penelopa-chrome: #131417;
+        --penelopa-chrome-ink: #e6e8eb;
+        --penelopa-accent: #4d9fff;
+        --penelopa-green: #3fb950;
+        --penelopa-ink: #e6e8eb;
+        --penelopa-muted: #9da3ab;
+        --penelopa-border: #383a3f;
+        --penelopa-hover: #2f3136;
+        --penelopa-selection: #2b3a52;
         background: var(--penelopa-bg);
         color: var(--penelopa-ink);
     }
@@ -93,15 +91,15 @@ h1:focus {
     --atlas-accent: var(--penelopa-accent);
     --atlas-surface: var(--penelopa-surface);
     --atlas-text: var(--penelopa-ink);
-    --atlas-splitter-size: 0.4rem;
+    --atlas-splitter-size: 0.25rem;
     --atlas-splitter-hit-area: 0.3rem;
     --atlas-chrome-height: 2.5rem;
     --atlas-gap: 0.5rem;
     --atlas-padding-compact: 0.5rem 0.75rem;
-    --atlas-radius: 0.75rem;
-    --atlas-radius-sm: 0.5rem;
-    --atlas-border-width: 2px;
-    --atlas-focus-ring-width: 3px;
+    --atlas-radius: 0.375rem;
+    --atlas-radius-sm: 0.25rem;
+    --atlas-border-width: 1px;
+    --atlas-focus-ring-width: 2px;
     --atlas-splitter-opacity: 0.9;
     --atlas-splitter-opacity-hover: 1;
     --atlas-splitter-opacity-focus: 1;
@@ -116,7 +114,7 @@ h1:focus {
     --atlas-tab-text-active: var(--penelopa-accent);
     --atlas-tab-bg-active: var(--penelopa-surface);
     --atlas-tab-bg-hover: var(--penelopa-hover);
-    --atlas-splitter-color: var(--penelopa-blue);
+    --atlas-splitter-color: color-mix(in srgb, var(--penelopa-ink) 35%, transparent);
     background: var(--penelopa-bg);
     color: var(--penelopa-ink);
 }
@@ -133,29 +131,29 @@ h1:focus {
 }
 
 .penelopa-shell .atlas-v2-group {
-    border: 2px solid var(--penelopa-border);
-    border-radius: var(--atlas-radius, 0.75rem);
-    box-shadow: 0 0.3rem 0 color-mix(in srgb, var(--penelopa-ink) 18%, transparent);
+    border: 1px solid var(--penelopa-border);
+    border-radius: var(--atlas-radius, 0.375rem);
+    box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--penelopa-ink) 14%, transparent);
     margin: 0.15rem;
 }
 
 .penelopa-shell .atlas-v2-splitter {
-    border-radius: 0.3rem;
-    box-shadow: 0 0 0 2px var(--penelopa-bg);
+    border-radius: 0.125rem;
+    box-shadow: 0 0 0 1px var(--penelopa-bg);
 }
 
 .penelopa-shell .atlas-v2-panel-header,
 .penelopa-shell .atlas-v2-tab-strip {
     min-height: 2.5rem;
     align-items: center;
-    border-bottom: 2px solid var(--penelopa-border);
-    border-radius: 0.6rem 0.6rem 0 0;
+    border-bottom: 1px solid var(--penelopa-border);
+    border-radius: 0.3rem 0.3rem 0 0;
     user-select: none;
 }
 
 .penelopa-shell .atlas-v2-panel-header {
     padding: 0 0.75rem;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 .penelopa-shell .atlas-v2-tab-strip {
@@ -167,10 +165,10 @@ h1:focus {
     min-height: 2.4rem;
     max-width: 13rem;
     overflow: hidden;
-    border: 2px solid transparent;
-    border-radius: 0.5rem 0.5rem 0 0;
+    border: 1px solid transparent;
+    border-radius: 0.3rem 0.3rem 0 0;
     padding: 0.25rem 0.8rem;
-    font-weight: 700;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -178,16 +176,16 @@ h1:focus {
 .penelopa-shell .atlas-v2-tab-strip [role="tab"][aria-selected="true"] {
     border-color: var(--penelopa-border);
     border-bottom-color: var(--atlas-tab-bg-active);
-    box-shadow: 0 0.25rem 0 var(--penelopa-accent);
+    box-shadow: inset 0 2px 0 var(--penelopa-accent);
 }
 
 .penelopa-shell .atlas-v2-toolbar {
-    width: 2.75rem;
+    width: 2.5rem;
     height: 100%;
     box-sizing: border-box;
     align-items: center;
     padding: 0.3rem 0;
-    border-inline: 2px solid var(--penelopa-border);
+    border-inline: 1px solid var(--penelopa-border);
 }
 
 .penelopa-shell .atlas-v2-toolbar-region {
@@ -196,15 +194,15 @@ h1:focus {
 
 .penelopa-shell .atlas-v2-toolbar button {
     width: 1.9rem;
-    min-height: 2.7rem;
+    min-height: 2.25rem;
     margin: 0.12rem auto;
     overflow: hidden;
     border: 0;
-    border-radius: 0.5rem;
+    border-radius: 0.25rem;
     padding: 0.25rem;
     background: transparent;
     color: var(--penelopa-chrome-ink);
-    font-weight: 700;
+    font-weight: 600;
     writing-mode: vertical-rl;
 }
 
@@ -212,34 +210,33 @@ h1:focus {
 .penelopa-shell .atlas-v2-toolbar button[aria-selected="true"] {
     background: var(--penelopa-surface);
     color: var(--penelopa-accent);
-    box-shadow: 0 0.15rem 0 var(--penelopa-border);
+    box-shadow: inset 0 0 0 1px var(--penelopa-border);
 }
 
 /* ---- 5. Penelopa top toolbar / status bar ---- */
 
 .penelopa-topbar {
-    min-height: 2.65rem;
+    min-height: 2.5rem;
     display: flex;
     align-items: center;
     gap: 0.35rem;
     padding: 0 0.6rem;
-    background: var(--penelopa-accent);
-    border-bottom: 3px solid var(--penelopa-border);
-    color: var(--penelopa-accent-ink);
+    background: var(--penelopa-chrome);
+    border-bottom: 1px solid var(--penelopa-border);
+    color: var(--penelopa-chrome-ink);
 }
 
 .penelopa-product {
     width: 5.75rem;
-    height: 1.75rem;
+    height: 1.6rem;
     display: grid;
     flex: 0 0 auto;
     place-items: center;
-    border: 2px solid var(--penelopa-border);
-    border-radius: 0.45rem;
-    background: linear-gradient(135deg, var(--penelopa-chrome), var(--penelopa-green) 48%, var(--penelopa-blue));
+    border: 1px solid color-mix(in srgb, var(--penelopa-chrome-ink) 24%, transparent);
+    border-radius: 0.25rem;
+    background: transparent;
     color: var(--penelopa-chrome-ink);
-    font-weight: 900;
-    box-shadow: 0 0.15rem 0 color-mix(in srgb, var(--penelopa-ink) 50%, transparent);
+    font-weight: 700;
 }
 
 .penelopa-menu,
@@ -251,18 +248,17 @@ h1:focus {
 
 .penelopa-menu button,
 .penelopa-runner button {
-    border: 2px solid transparent;
-    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
     padding: 0.25rem 0.55rem;
     background: transparent;
-    color: var(--penelopa-accent-ink);
-    font-weight: 700;
+    color: var(--penelopa-chrome-ink);
+    font-weight: 600;
 }
 
 .penelopa-menu button:hover,
 .penelopa-runner button:hover {
-    background: color-mix(in srgb, var(--penelopa-accent) 80%, black);
-    border-color: var(--penelopa-border);
+    background: color-mix(in srgb, var(--penelopa-chrome-ink) 14%, transparent);
 }
 
 .penelopa-runner {
@@ -270,7 +266,7 @@ h1:focus {
 }
 
 .penelopa-branch {
-    color: color-mix(in srgb, var(--penelopa-accent-ink) 75%, transparent);
+    color: color-mix(in srgb, var(--penelopa-chrome-ink) 70%, transparent);
     margin-inline-end: 0.35rem;
 }
 
@@ -283,7 +279,7 @@ h1:focus {
 }
 
 .penelopa-run {
-    color: var(--penelopa-chrome) !important;
+    color: var(--penelopa-accent) !important;
 }
 
 .penelopa-statusbar {
@@ -293,7 +289,7 @@ h1:focus {
     gap: 0.75rem;
     padding: 0 0.65rem;
     background: var(--penelopa-chrome);
-    border-top: 2px solid var(--penelopa-border);
+    border-top: 1px solid var(--penelopa-border);
     color: var(--penelopa-chrome-ink);
     font-size: 0.75rem;
     font-weight: 600;
@@ -325,7 +321,8 @@ h1:focus {
 
 .penelopa-tools h3 {
     margin: 0 0 0.75rem;
-    font-size: 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
     color: var(--penelopa-ink);
 }
 
@@ -351,23 +348,22 @@ h1:focus {
 .penelopa-tool-button {
     padding: 0.3rem 0.6rem;
     font-size: 0.8rem;
-    font-weight: 700;
+    font-weight: 500;
     cursor: pointer;
-    background: var(--penelopa-chrome);
-    border: 2px solid var(--penelopa-border);
-    border-radius: 0.5rem;
-    color: var(--penelopa-chrome-ink);
-    box-shadow: 0 0.15rem 0 color-mix(in srgb, var(--penelopa-ink) 40%, transparent);
+    background: var(--penelopa-surface);
+    border: 1px solid var(--penelopa-border);
+    border-radius: 0.25rem;
+    color: var(--penelopa-ink);
 }
 
 .penelopa-tool-button:hover {
-    background: var(--penelopa-blue);
-    color: #fff;
+    background: var(--penelopa-hover);
+    border-color: var(--penelopa-accent);
+    color: var(--penelopa-accent);
 }
 
 .penelopa-tool-button:active {
-    box-shadow: none;
-    transform: translateY(0.1rem);
+    background: var(--penelopa-selection);
 }
 
 .penelopa-tree-list {
@@ -382,8 +378,8 @@ h1:focus {
     text-align: left;
     padding: 0.3rem 0.6rem;
     margin-bottom: 0.2rem;
-    border: 2px solid transparent;
-    border-radius: 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
     background: transparent;
     color: var(--penelopa-ink);
     cursor: pointer;
@@ -396,7 +392,7 @@ h1:focus {
 .penelopa-tree-item.selected {
     background: var(--penelopa-selection);
     color: var(--penelopa-ink);
-    border-color: var(--penelopa-border);
+    border-color: var(--penelopa-accent);
 }
 
 .penelopa-tree-empty,
@@ -405,10 +401,10 @@ h1:focus {
 }
 
 .penelopa-properties-title {
-    font-weight: 800;
+    font-weight: 600;
     margin-bottom: 0.6rem;
     padding-bottom: 0.4rem;
-    border-bottom: 2px solid var(--penelopa-border);
+    border-bottom: 1px solid var(--penelopa-border);
 }
 
 .penelopa-properties-item {
@@ -428,15 +424,15 @@ h1:focus {
     width: 100%;
     box-sizing: border-box;
     padding: 0.35rem 0.55rem;
-    border: 2px solid var(--penelopa-border);
-    border-radius: 0.45rem;
+    border: 1px solid var(--penelopa-border);
+    border-radius: 0.25rem;
     background: var(--penelopa-surface);
     color: var(--penelopa-ink);
     font: inherit;
 }
 
 .penelopa-properties .form-control:focus {
-    outline: var(--atlas-focus-ring-width, 3px) solid var(--penelopa-accent);
+    outline: var(--atlas-focus-ring-width, 2px) solid var(--penelopa-accent);
     outline-offset: 1px;
 }
 
@@ -454,9 +450,9 @@ h1:focus {
     display: block;
     box-sizing: border-box;
     background: #000;
-    border: 2px solid var(--penelopa-border);
-    border-radius: var(--atlas-radius, 0.75rem);
-    box-shadow: 0 0.3rem 0 color-mix(in srgb, var(--penelopa-ink) 18%, transparent);
+    border: 1px solid var(--penelopa-border);
+    border-radius: var(--atlas-radius, 0.375rem);
+    box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--penelopa-ink) 14%, transparent);
 }
 
 /* ---- 7. Bootstrap leftovers (default template rules) ---- */

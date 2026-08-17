@@ -21,7 +21,7 @@ vertical-center / bottom) for circle, rectangle, and triangle primitives.
 - Circle / Rectangle / Triangle primitives with an editable property system
 - Six-direction alignment against the union bounding box, with idempotence
 - Property editor driven by the primitive property model
-- Gundam-themed light/dark skin driven by `--penelopa-*` CSS variables
+- Bright studio light/dark skin driven by `--penelopa-*` CSS variables
 
 ## Project Structure
 
