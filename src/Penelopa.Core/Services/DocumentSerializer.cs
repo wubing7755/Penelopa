@@ -4,10 +4,9 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Services;
 
 /// <summary>
-/// Serializes the primitive tree to and from JSON. Color keys are never
-/// serialized — loading rebuilds them via <see cref="ColorKeyManager"/> — and
-/// the selection is stored as primitive ids so it can be re-resolved after
-/// load. Container children are nested inside their parent.
+/// Serializes the primitive tree to and from JSON. The selection is stored as
+/// primitive ids so it can be re-resolved after load. Container children are
+/// nested inside their parent.
 /// </summary>
 public static class DocumentSerializer
 {
@@ -48,32 +47,38 @@ public static class DocumentSerializer
     /// </summary>
     public static DeserializeResult? Deserialize(string json)
     {
-        DocumentDto? dto;
         try
         {
-            dto = JsonSerializer.Deserialize<DocumentDto>(json, Options);
+            var dto = JsonSerializer.Deserialize<DocumentDto>(json, Options);
+            if (dto?.Primitives is null)
+            {
+                return null;
+            }
+
+            var roots = new List<Primitive>();
+            foreach (var primitiveDto in dto.Primitives)
+            {
+                var primitive = FromDto(primitiveDto);
+                if (primitive is not null)
+                {
+                    roots.Add(primitive);
+                }
+            }
+
+            return new DeserializeResult(roots, dto.SelectionIds ?? new List<Guid>());
         }
         catch (JsonException)
         {
+            // Malformed JSON.
             return null;
         }
-
-        if (dto?.Primitives is null)
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or OverflowException or InvalidCastException or ArgumentException)
         {
+            // Valid JSON but a malformed document (unknown type/kind, or a
+            // property of the wrong type), e.g. a hand-edited or future-version
+            // file. Treat it the same as invalid JSON.
             return null;
         }
-
-        var roots = new List<Primitive>();
-        foreach (var primitiveDto in dto.Primitives)
-        {
-            var primitive = FromDto(primitiveDto);
-            if (primitive is not null)
-            {
-                roots.Add(primitive);
-            }
-        }
-
-        return new DeserializeResult(roots, dto.SelectionIds ?? new List<Guid>());
     }
 
     private static PrimitiveDto ToDto(Primitive primitive)
@@ -81,19 +86,9 @@ public static class DocumentSerializer
         var props = new Dictionary<string, object>();
         foreach (var prop in primitive.Props)
         {
-            if (ReferenceEquals(prop, primitive.ColorKey))
+            if (prop.GetBoxedValue() is { } value)
             {
-                continue;
-            }
-
-            switch (prop)
-            {
-                case FloatPropValue fp: props[prop.Name] = fp.Value; break;
-                case DoublePropValue dp: props[prop.Name] = dp.Value; break;
-                case IntPropValue ip: props[prop.Name] = ip.Value; break;
-                case BoolPropValue bp: props[prop.Name] = bp.Value; break;
-                case StringPropValue sp: props[prop.Name] = sp.Value; break;
-                case UintPropValue up: props[prop.Name] = up.Value; break;
+                props[prop.Name] = value;
             }
         }
 
@@ -159,48 +154,14 @@ public static class DocumentSerializer
     {
         foreach (var prop in primitive.Props)
         {
-            if (ReferenceEquals(prop, primitive.ColorKey))
-            {
-                continue;
-            }
-
             if (!props.TryGetValue(prop.Name, out var value))
             {
                 continue;
             }
 
-            switch (prop)
-            {
-                case FloatPropValue fp: fp.Value = ToSingle(value); break;
-                case DoublePropValue dp: dp.Value = ToDouble(value); break;
-                case IntPropValue ip: ip.Value = ToInt32(value); break;
-                case BoolPropValue bp: bp.Value = ToBoolean(value); break;
-                case StringPropValue sp: sp.Value = ToString(value); break;
-                case UintPropValue up: up.Value = ToUInt32(value); break;
-            }
+            prop.SetBoxedValue(value);
         }
     }
-
-    // System.Text.Json deserializes dictionary numbers as JsonElement, so the
-    // plain Convert helpers would throw.
-
-    private static float ToSingle(object value)
-        => value is JsonElement element ? element.GetSingle() : Convert.ToSingle(value);
-
-    private static double ToDouble(object value)
-        => value is JsonElement element ? element.GetDouble() : Convert.ToDouble(value);
-
-    private static int ToInt32(object value)
-        => value is JsonElement element ? element.GetInt32() : Convert.ToInt32(value);
-
-    private static bool ToBoolean(object value)
-        => value is JsonElement element ? element.GetBoolean() : Convert.ToBoolean(value);
-
-    private static string ToString(object value)
-        => value is JsonElement element ? element.GetString() ?? string.Empty : Convert.ToString(value) ?? string.Empty;
-
-    private static uint ToUInt32(object value)
-        => value is JsonElement element ? element.GetUInt32() : Convert.ToUInt32(value);
 }
 
 /// <summary>Result of deserializing a document.</summary>

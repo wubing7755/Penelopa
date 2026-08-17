@@ -14,7 +14,7 @@
     else
     {
         <div class="penelopa-properties-title">@_targetPrimitive.Name.Value</div>
-        @foreach (var prop in _targetPrimitive.Props.Where(p => !ReferenceEquals(p, _targetPrimitive.ColorKey)))
+        @foreach (var prop in _targetPrimitive.Props)
         {
             <div class="penelopa-properties-item">
                 @switch (prop)

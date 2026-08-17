@@ -17,7 +17,7 @@ public class EditorInteractionControllerTests
         var controller = new EditorInteractionController(host);
         var rect = Rect(0f, 0f);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
 
         Assert.Equal(ControllerState.Pressed, controller.State);
         Assert.Same(rect, host.Selected);
@@ -30,7 +30,7 @@ public class EditorInteractionControllerTests
         var controller = new EditorInteractionController(host);
         host.Select(Rect(0f, 0f));
 
-        controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
+        controller.PointerDown(new Point(50f, 50f), new Point(50f, 50f), default, ctrl: false);
 
         // Pressing empty space enters Pressed (a pan candidate) and clears
         // the selection immediately; a plain click commits as a click.
@@ -44,9 +44,9 @@ public class EditorInteractionControllerTests
         var host = new TestHost();
         var controller = new EditorInteractionController(host);
 
-        controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
-        controller.PointerMove(new Point(80f, 50f));   // crosses the threshold
-        controller.PointerMove(new Point(100f, 60f));  // incremental pan
+        controller.PointerDown(new Point(50f, 50f), new Point(50f, 50f), default, ctrl: false);
+        controller.PointerMove(new Point(80f, 50f), new Point(80f, 50f));   // crosses the threshold
+        controller.PointerMove(new Point(100f, 60f), new Point(100f, 60f));  // incremental pan
         controller.PointerUp(new Point(100f, 60f));
 
         Assert.Equal(ControllerState.Idle, controller.State);
@@ -61,7 +61,7 @@ public class EditorInteractionControllerTests
         var host = new TestHost();
         var controller = new EditorInteractionController(host);
 
-        controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
+        controller.PointerDown(new Point(50f, 50f), new Point(50f, 50f), default, ctrl: false);
         controller.PointerUp(new Point(50f, 50f));
 
         Assert.Empty(host.PanCalls);
@@ -76,12 +76,12 @@ public class EditorInteractionControllerTests
         var rect = Rect(0f, 0f);
         host.Select(rect);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
-        controller.PointerMove(new Point(20f, 5f)); // beyond threshold
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerMove(new Point(20f, 5f), new Point(20f, 5f)); // beyond threshold
         Assert.Equal(ControllerState.Dragging, controller.State);
         Assert.Equal(15f, rect.PosX.Value); // translated by 15
 
-        controller.PointerMove(new Point(30f, 10f));
+        controller.PointerMove(new Point(30f, 10f), new Point(30f, 10f));
         Assert.Equal(25f, rect.PosX.Value);
         Assert.Equal(5f, rect.PosY.Value);
 
@@ -99,8 +99,8 @@ public class EditorInteractionControllerTests
         var rect = Rect(0f, 0f);
         host.Select(rect);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
-        controller.PointerMove(new Point(6f, 6f)); // within threshold
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerMove(new Point(6f, 6f), new Point(6f, 6f)); // within threshold
         controller.PointerUp(new Point(6f, 6f));
 
         Assert.Equal(0f, rect.PosX.Value);
@@ -118,11 +118,12 @@ public class EditorInteractionControllerTests
         // BottomRight handle of rect (0,0,10,10) in world Y-up: (MaxX, MinY) = (10,0).
         controller.PointerDown(
             new Point(10f, 0f),
+            new Point(10f, 0f),
             new HitTestResult { Handle = ResizeHandle.BottomRight, Primitive = rect },
             ctrl: false);
         Assert.Equal(ControllerState.Resizing, controller.State);
 
-        controller.PointerMove(new Point(30f, 0f));
+        controller.PointerMove(new Point(30f, 0f), new Point(30f, 0f));
         controller.PointerUp(new Point(30f, 0f));
 
         // Fixed corner (0,10); pointer (30,0) → box (0,0,30,10).
@@ -138,9 +139,9 @@ public class EditorInteractionControllerTests
         var rect = Rect(0f, 0f);
         host.Select(rect);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
-        controller.PointerMove(new Point(30f, 5f));
-        controller.PointerMove(new Point(40f, 5f));
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerMove(new Point(30f, 5f), new Point(30f, 5f));
+        controller.PointerMove(new Point(40f, 5f), new Point(40f, 5f));
         controller.Cancel();
 
         Assert.Equal(0f, rect.PosX.Value);
@@ -158,9 +159,10 @@ public class EditorInteractionControllerTests
 
         controller.PointerDown(
             new Point(10f, 0f),
+            new Point(10f, 0f),
             new HitTestResult { Handle = ResizeHandle.BottomRight, Primitive = rect },
             ctrl: false);
-        controller.PointerMove(new Point(50f, 0f));
+        controller.PointerMove(new Point(50f, 0f), new Point(50f, 0f));
         controller.Cancel();
 
         Assert.Equal(10f, rect.Width.Value);
@@ -178,9 +180,10 @@ public class EditorInteractionControllerTests
         // BottomRight handle of bbox (5,5,15,15): world corner (MaxX, MinY) = (15,5).
         controller.PointerDown(
             new Point(15f, 5f),
+            new Point(15f, 5f),
             new HitTestResult { Handle = ResizeHandle.BottomRight, Primitive = circle },
             ctrl: false);
-        controller.PointerMove(new Point(35f, -5f)); // target (5,-5,35,15): w=30, h=20 → r=10
+        controller.PointerMove(new Point(35f, -5f), new Point(35f, -5f)); // target (5,-5,35,15): w=30, h=20 → r=10
         controller.PointerUp(new Point(35f, -5f));
 
         // Fixed corner (5,15) stays on the circle; the circle grew to r=10.
@@ -198,7 +201,7 @@ public class EditorInteractionControllerTests
         var b = Rect(20f, 0f);
         host.SelectRange(a, b);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: true);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: true);
 
         Assert.Equal(ControllerState.Idle, controller.State);
         Assert.Contains(b, host.Selection);
@@ -219,7 +222,7 @@ public class EditorInteractionControllerTests
         // Ctrl-click the child: the outermost candidate (the container) is
         // already selected → toggled off, not the child.
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: true);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: true);
 
         Assert.Equal(ControllerState.Idle, controller.State);
         Assert.Contains(existing, host.Selection);
@@ -237,7 +240,7 @@ public class EditorInteractionControllerTests
         container.AddChild(child);
 
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: true);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: true);
 
         Assert.Contains(container, host.Selection);
         Assert.DoesNotContain(child, host.Selection);
@@ -252,7 +255,7 @@ public class EditorInteractionControllerTests
         var b = Rect(20f, 0f);
         host.SelectRange(a, b);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
 
         Assert.Same(a, host.Selected);
@@ -267,9 +270,9 @@ public class EditorInteractionControllerTests
         var b = Rect(20f, 0f);
         host.SelectRange(a, b);
 
-        controller.PointerDown(new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: false);
-        controller.PointerMove(new Point(25f, 5f));  // dx = +20 from press
-        controller.PointerMove(new Point(35f, 15f)); // dx = +10, dy = +10
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = a }, ctrl: false);
+        controller.PointerMove(new Point(25f, 5f), new Point(25f, 5f));  // dx = +20 from press
+        controller.PointerMove(new Point(35f, 15f), new Point(35f, 15f)); // dx = +10, dy = +10
         controller.PointerUp(new Point(35f, 15f));
 
         Assert.Equal(30f, a.PosX.Value);
@@ -288,12 +291,74 @@ public class EditorInteractionControllerTests
         var b = Rect(20f, 0f);
         host.SelectRange(a, b);
 
-        controller.PointerDown(new Point(10f, 10f), new HitTestResult { InUnionBox = true }, ctrl: false);
-        controller.PointerMove(new Point(30f, 10f));
+        controller.PointerDown(new Point(10f, 10f), new Point(10f, 10f), new HitTestResult { InUnionBox = true }, ctrl: false);
+        controller.PointerMove(new Point(30f, 10f), new Point(30f, 10f));
         controller.PointerUp(new Point(30f, 10f));
 
         Assert.Equal(20f, a.PosX.Value);
         Assert.Equal(40f, b.PosX.Value);
+    }
+
+    [Fact]
+    public void Click_DoesNotBeginMutation()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+        var rect = Rect(0f, 0f);
+
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerUp(new Point(5f, 5f));
+
+        Assert.Equal(0, host.MutationStarts);
+    }
+
+    [Fact]
+    public void EmptySpaceDrag_DoesNotBeginMutation()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+
+        controller.PointerDown(new Point(50f, 50f), new Point(50f, 50f), default, ctrl: false);
+        controller.PointerMove(new Point(80f, 50f), new Point(80f, 50f));
+        controller.PointerUp(new Point(80f, 50f));
+
+        Assert.Equal(0, host.MutationStarts);
+    }
+
+    [Fact]
+    public void Drag_BeginsMutationOnce()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+        var rect = Rect(0f, 0f);
+        host.Select(rect);
+
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), new HitTestResult { Primitive = rect }, ctrl: false);
+        controller.PointerMove(new Point(20f, 5f), new Point(20f, 5f));
+        controller.PointerMove(new Point(30f, 5f), new Point(30f, 5f));
+        controller.PointerUp(new Point(30f, 5f));
+
+        Assert.Equal(1, host.MutationStarts);
+    }
+
+    [Fact]
+    public void Resize_BeginsMutationOnce()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+        var rect = Rect(0f, 0f);
+        host.Select(rect);
+
+        controller.PointerDown(
+            new Point(10f, 0f),
+            new Point(10f, 0f),
+            new HitTestResult { Handle = ResizeHandle.BottomRight, Primitive = rect },
+            ctrl: false);
+        controller.PointerMove(new Point(30f, 0f), new Point(30f, 0f));
+        controller.PointerMove(new Point(40f, 0f), new Point(40f, 0f));
+        controller.PointerUp(new Point(40f, 0f));
+
+        Assert.Equal(1, host.MutationStarts);
     }
 
     private sealed class TestHost : IEditorInteractionHost
@@ -305,6 +370,7 @@ public class EditorInteractionControllerTests
         public bool Cleared { get; private set; }
         public List<Primitive> Notified { get; } = new();
         public List<Point> PanCalls { get; } = new();
+        public int MutationStarts { get; private set; }
 
         public void Select(Primitive primitive)
         {
@@ -354,9 +420,14 @@ public class EditorInteractionControllerTests
             _selection.Clear();
         }
 
-        public void PanByWorld(float deltaX, float deltaY)
+        public void PanByCss(float deltaX, float deltaY)
         {
             PanCalls.Add(new Point(deltaX, deltaY));
+        }
+
+        public void BeginMutation()
+        {
+            MutationStarts++;
         }
 
         public void NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)

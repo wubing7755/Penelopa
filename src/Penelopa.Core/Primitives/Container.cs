@@ -85,9 +85,26 @@ public sealed class Container : Primitive
     /// TRS composition, so panel edits take effect immediately.
     /// </summary>
     public Transform LocalTransform
-        => Transform.Translate(OffsetX.Value, OffsetY.Value)
-            .Multiply(Transform.Rotate(Rotation.Value))
-            .Multiply(Transform.Scale(ScaleX.Value, ScaleY.Value));
+    {
+        get
+        {
+            // Floor the scale away from zero: a zero or near-zero scale makes
+            // the transform singular, so Transform.Invert() throws and crashes
+            // child drag/resize. The property panel may still hold the raw
+            // value; the effective transform is always invertible.
+            return Transform.Translate(OffsetX.Value, OffsetY.Value)
+                .Multiply(Transform.Rotate(Rotation.Value))
+                .Multiply(Transform.Scale(ClampScale(ScaleX.Value), ClampScale(ScaleY.Value)));
+        }
+    }
+
+    /// <summary>Floors a scale magnitude so the local transform stays invertible.</summary>
+    private static float ClampScale(float value)
+        => value >= 0f
+            ? MathF.Max(value, MinScaleMagnitude)
+            : MathF.Min(value, -MinScaleMagnitude);
+
+    private const float MinScaleMagnitude = 0.01f;
 
     /// <summary>Gets the child primitives in render order (first = bottom).</summary>
     public IReadOnlyList<Primitive> Children => _children;

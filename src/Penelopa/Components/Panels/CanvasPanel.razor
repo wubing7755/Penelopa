@@ -1,6 +1,7 @@
 @namespace Penelopa.Components
 @using Atlas.Blazor.Content
 @using Microsoft.JSInterop
+@using Penelopa.Core.Alignment
 @using Penelopa.Core.Interaction
 @using Penelopa.Core.Primitives
 @using Penelopa.Core.Services
@@ -29,8 +30,6 @@
     private readonly List<Primitive> _selection = new();
     private readonly EditorInteractionController _controller;
     private double _dpr = 1;
-    private float _lastPanCssDx;
-    private float _lastPanCssDy;
     private DotNetObjectReference<CanvasPanel>? _dprRef;
     private ElementReference _canvasElement;
     private IJSObjectReference? _pointerHandle;
@@ -84,20 +83,18 @@
     public void OnPointerDown(double x, double y, double button, bool ctrl, bool shift, long pointerId)
     {
         _renderer.SetDevicePixelRatio((float)_dpr);
-        // Capture the pre-gesture state so drag/resize can be undone.
-        PrimitiveService.CaptureForGesture();
-        var cssX = (float)x;
-        var cssY = (float)y;
-        var world = _renderer.CssToWorld(cssX, cssY);
-        var hit = _renderer.HitTestSelection(cssX, cssY, PrimitiveService.GetSelection().ToList());
-        _controller.PointerDown(world, hit, ctrl);
+        var css = new Point((float)x, (float)y);
+        var world = _renderer.CssToWorld(css.X, css.Y);
+        var hit = _renderer.HitTestSelection(css.X, css.Y, PrimitiveService.GetSelection().ToList());
+        _controller.PointerDown(world, css, hit, ctrl);
     }
 
     [JSInvokable]
     public void OnPointerMove(double x, double y)
     {
-        var world = _renderer.CssToWorld((float)x, (float)y);
-        _controller.PointerMove(world);
+        var css = new Point((float)x, (float)y);
+        var world = _renderer.CssToWorld(css.X, css.Y);
+        _controller.PointerMove(world, css);
     }
 
     [JSInvokable]
@@ -191,22 +188,11 @@
     void IEditorInteractionHost.ClearSelection()
         => PrimitiveService.ClearSelection();
 
-    void IEditorInteractionHost.PanByWorld(float deltaX, float deltaY)
-    {
-        // The controller reports world-space deltas, but the css→world
-        // conversion already includes the current pan, so consecutive
-        // gestures accumulate an error (each step loses the previous step's
-        // displacement — the jitter). Compensate with the last CSS pan to get
-        // the pure pointer displacement:
-        //   cssDx = deltaX * zoom + lastCssDx
-        //   cssDy = -deltaY * zoom + lastCssDy   (world Y up, screen Y down)
-        float zoom = _renderer.CurrentViewTransform.Zoom;
-        float cssDx = deltaX * zoom + _lastPanCssDx;
-        float cssDy = -deltaY * zoom + _lastPanCssDy;
-        _renderer.PanBy(cssDx, cssDy);
-        _lastPanCssDx = cssDx;
-        _lastPanCssDy = cssDy;
-    }
+    void IEditorInteractionHost.BeginMutation()
+        => PrimitiveService.CaptureForGesture();
+
+    void IEditorInteractionHost.PanByCss(float deltaX, float deltaY)
+        => _renderer.PanBy(deltaX, deltaY);
 
     void IEditorInteractionHost.NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)
         => PrimitiveService.NotifyPrimitivesChanged(primitives);

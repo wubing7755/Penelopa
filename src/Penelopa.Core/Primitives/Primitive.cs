@@ -15,13 +15,9 @@ public abstract class Primitive : IAlignable
 
         Name = new StringPropValue("Name", name);
         AddProp(Name);
-        ColorKey = new UintPropValue("ColorKey", ColorKeyManager.GenerateColorKey(this));
-        AddProp(ColorKey);
     }
 
     public Guid Id { get; internal set; }
-
-    public UintPropValue ColorKey { get; }
 
     public StringPropValue Name { get; }
 
@@ -135,19 +131,13 @@ public abstract class Primitive : IAlignable
     internal bool ContainsParentLocalPoint(Point point) => ContainsLocalPoint(point);
 
     /// <inheritdoc/>
-    public Transform GetWorldTransform()
-    {
-        var currentPos = GetCurrentPosition();
-        return Transform.Translate(currentPos.X, currentPos.Y);
-    }
+    public Point GetWorldPosition() => GetCurrentPosition();
 
     /// <inheritdoc/>
-    public void SetWorldTransform(Transform transform)
+    public void SetWorldPosition(Point position)
     {
         var currentPos = GetCurrentPosition();
-        var deltaX = transform.Tx - currentPos.X;
-        var deltaY = transform.Ty - currentPos.Y;
-        Translate(deltaX, deltaY);
+        Translate(position.X - currentPos.X, position.Y - currentPos.Y);
     }
 
     /// <summary>

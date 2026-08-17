@@ -41,7 +41,7 @@ public class PrimitiveService : IPrimitiveService
         if (primitive.Parent is Container parent)
         {
             parent.RemoveChild(primitive);
-            ReleaseSubtreeKeys(primitive);
+            _selection.Remove(primitive);
             OnCollectionChanged?.Invoke();
             return;
         }
@@ -52,21 +52,7 @@ public class PrimitiveService : IPrimitiveService
         }
 
         _selection.Remove(primitive);
-        ReleaseSubtreeKeys(primitive);
         OnCollectionChanged?.Invoke();
-    }
-
-    private static void ReleaseSubtreeKeys(Primitive root)
-    {
-        if (root is Container container)
-        {
-            foreach (var child in container.Children)
-            {
-                ReleaseSubtreeKeys(child);
-            }
-        }
-
-        ColorKeyManager.ReleaseColorKey(root.ColorKey.Value);
     }
 
     public IEnumerable<Primitive> GetAll()
@@ -84,11 +70,6 @@ public class PrimitiveService : IPrimitiveService
         if (clearHistory)
         {
             _history.Clear();
-        }
-
-        foreach (var primitive in _primitives)
-        {
-            ReleaseSubtreeKeys(primitive);
         }
 
         _primitives.Clear();

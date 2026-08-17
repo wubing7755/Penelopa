@@ -22,6 +22,14 @@ public sealed class CanvasRenderer
     private SKBitmap _hitBitmap = new(new SKImageInfo(FallbackCanvasSize, FallbackCanvasSize));
     private ViewTransform _viewTransform = new(FallbackCanvasSize, FallbackCanvasSize, 1f);
 
+    // Color keys are assigned per render (see DrawPrimitives): the hit buffer
+    // is rebuilt every frame, so the key only needs to be consistent within a
+    // single render→hit cycle. No persistent global registry is required.
+    private readonly Dictionary<uint, Primitive> _colorMap = new();
+    private uint _nextColorKey = FirstColorKey;
+
+    private const uint FirstColorKey = 0xFF000001;
+
     private readonly SKPaint _axisPaint = new()
     {
         Color = SKColors.Red,
@@ -205,7 +213,7 @@ public sealed class CanvasRenderer
 
         var color = _hitBitmap.GetPixel(x, y);
         var colorKey = (uint)color;
-        return ColorKeyManager.TryGetPrimitive(colorKey, out var primitive) ? primitive : null;
+        return _colorMap.TryGetValue(colorKey, out var primitive) ? primitive : null;
     }
 
     /// <summary>
@@ -420,6 +428,11 @@ public sealed class CanvasRenderer
             // hit buffer so the axes stay non-interactive.
             DrawCoordinateSystem(canvas);
 
+            // Rebuild the per-frame color-key map before drawing so the hit
+            // buffer and its lookup table stay in sync for this frame.
+            _colorMap.Clear();
+            _nextColorKey = FirstColorKey;
+
             foreach (var primitive in primitives)
             {
                 DrawNode(canvas, hitCanvas, primitive);
@@ -439,7 +452,7 @@ public sealed class CanvasRenderer
     /// into children, then restore. Render order equals Z order: later nodes
     /// cover earlier ones.
     /// </summary>
-    private static void DrawNode(SKCanvas canvas, SKCanvas hitCanvas, Primitive node)
+    private void DrawNode(SKCanvas canvas, SKCanvas hitCanvas, Primitive node)
     {
         if (node is Container container)
         {
@@ -462,17 +475,29 @@ public sealed class CanvasRenderer
         {
             case Circle circle:
                 DrawCircle(canvas, circle);
-                DrawHitCircle(hitCanvas, circle);
+                DrawHitCircle(hitCanvas, circle, RegisterHitKey(circle));
                 break;
             case Rectangle rectangle:
                 DrawRectangle(canvas, rectangle);
-                DrawHitRectangle(hitCanvas, rectangle);
+                DrawHitRectangle(hitCanvas, rectangle, RegisterHitKey(rectangle));
                 break;
             case Triangle triangle:
                 DrawTriangle(canvas, triangle);
-                DrawHitTriangle(hitCanvas, triangle);
+                DrawHitTriangle(hitCanvas, triangle, RegisterHitKey(triangle));
                 break;
         }
+    }
+
+    /// <summary>
+    /// Assigns the next per-frame color key to a primitive and records the
+    /// mapping used by <see cref="HitTest"/>. Keys are only valid until the
+    /// next render, which is exactly the lifetime of the hit buffer.
+    /// </summary>
+    private uint RegisterHitKey(Primitive node)
+    {
+        var key = _nextColorKey++;
+        _colorMap[key] = node;
+        return key;
     }
 
     /// <summary>Converts the Core affine transform to an Skia matrix.</summary>
@@ -504,9 +529,9 @@ public sealed class CanvasRenderer
         canvas.DrawCircle(circle.CenterX.Value, circle.CenterY.Value, circle.Radius.Value, paint);
     }
 
-    private static void DrawHitCircle(SKCanvas hitCanvas, Circle circle)
+    private static void DrawHitCircle(SKCanvas hitCanvas, Circle circle, uint colorKey)
     {
-        var color = Color.FromUint(circle.ColorKey.Value);
+        var color = Color.FromUint(colorKey);
         using var paint = new SKPaint
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
@@ -535,9 +560,9 @@ public sealed class CanvasRenderer
         canvas.DrawRect(rect, paint);
     }
 
-    private static void DrawHitRectangle(SKCanvas hitCanvas, Rectangle rectangle)
+    private static void DrawHitRectangle(SKCanvas hitCanvas, Rectangle rectangle, uint colorKey)
     {
-        var color = Color.FromUint(rectangle.ColorKey.Value);
+        var color = Color.FromUint(colorKey);
         using var paint = new SKPaint
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
@@ -568,9 +593,9 @@ public sealed class CanvasRenderer
         canvas.DrawPath(path, paint);
     }
 
-    private static void DrawHitTriangle(SKCanvas hitCanvas, Triangle triangle)
+    private static void DrawHitTriangle(SKCanvas hitCanvas, Triangle triangle, uint colorKey)
     {
-        var color = Color.FromUint(triangle.ColorKey.Value);
+        var color = Color.FromUint(colorKey);
         using var paint = new SKPaint
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),

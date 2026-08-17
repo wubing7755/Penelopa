@@ -36,7 +36,6 @@ public class DocumentSerializerTests
         Assert.Equal(12.5f, c.CenterX.Value);
         Assert.Equal(-3f, c.CenterY.Value);
         Assert.Equal(7f, c.Radius.Value);
-        Assert.NotEqual(circle.ColorKey.Value, c.ColorKey.Value); // keys are rebuilt
     }
 
     [Fact]
@@ -70,11 +69,20 @@ public class DocumentSerializerTests
     }
 
     [Fact]
-    public void Deserialize_DoesNotCarryColorKeys()
+    public void Deserialize_UnknownType_ReturnsNull()
     {
-        var rect = new Rectangle { PosX = { Value = 0f } };
-        var json = DocumentSerializer.Serialize(new Primitive[] { rect }, Array.Empty<Primitive>());
+        var json = "{\"Primitives\": [{\"Id\": \"00000000-0000-0000-0000-000000000001\", \"Type\": \"Hexagon\", \"Props\": {}}]}";
 
-        Assert.DoesNotContain("ColorKey", json);
+        Assert.Null(DocumentSerializer.Deserialize(json));
+    }
+
+    [Fact]
+    public void Deserialize_WrongPropType_ReturnsNull()
+    {
+        // A string where a number is expected: applying the property throws on
+        // the type mismatch, and Deserialize must swallow it rather than crash.
+        var json = "{\"Primitives\": [{\"Id\": \"00000000-0000-0000-0000-000000000001\", \"Type\": \"Rectangle\", \"Props\": {\"Width\": \"wide\"}}]}";
+
+        Assert.Null(DocumentSerializer.Deserialize(json));
     }
 }

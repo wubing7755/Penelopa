@@ -29,10 +29,18 @@ public interface IEditorInteractionHost
     void ClearSelection();
 
     /// <summary>
-    /// Pans the view by a world-space delta (the host converts to CSS pixels
-    /// using the current zoom). Used by the empty-space drag gesture.
+    /// Pans the view by a CSS-pixel delta. Used by the empty-space drag
+    /// gesture; the controller reports CSS deltas because panning is a view
+    /// operation, not a world-space geometry change.
     /// </summary>
-    void PanByWorld(float deltaX, float deltaY);
+    void PanByCss(float deltaX, float deltaY);
+
+    /// <summary>
+    /// Signals that a mutating gesture (drag or resize) is about to begin, so
+    /// the host can capture undo state before the first geometry change. Fired
+    /// exactly once per gesture, at the first actual mutation.
+    /// </summary>
+    void BeginMutation();
 
     /// <summary>
     /// Announces that the given primitives' geometry changed (drag/resize

@@ -24,7 +24,7 @@ public class DrillDownTests
         // Candidates are ordered root → deepest leaf (confirmed drill direction).
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
 
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
 
         Assert.Same(container, host.Selected);
     }
@@ -37,9 +37,9 @@ public class DrillDownTests
         var controller = new EditorInteractionController(host);
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
 
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
 
         Assert.Same(child, host.Selected);
@@ -53,10 +53,10 @@ public class DrillDownTests
         var controller = new EditorInteractionController(host);
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
 
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
         // Move far away → different chain/spot, resets index.
-        controller.PointerDown(new Point(500f, 500f), hit, ctrl: false);
+        controller.PointerDown(new Point(500f, 500f), new Point(500f, 500f), hit, ctrl: false);
         controller.PointerUp(new Point(500f, 500f));
 
         Assert.Same(container, host.Selected);
@@ -70,11 +70,11 @@ public class DrillDownTests
         var controller = new EditorInteractionController(host);
         var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
 
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
-        controller.PointerDown(new Point(5f, 5f), hit, ctrl: false);
+        controller.PointerDown(new Point(5f, 5f), new Point(5f, 5f), hit, ctrl: false);
         controller.PointerUp(new Point(5f, 5f));
 
         Assert.Same(child, host.Selected); // does not wrap around
@@ -119,9 +119,13 @@ public class DrillDownTests
 
         public void ClearSelection() => Selection.Clear();
 
-        public void PanByWorld(float deltaX, float deltaY)
+        public void PanByCss(float deltaX, float deltaY)
         {
             PanCalls.Add(new Point(deltaX, deltaY));
+        }
+
+        public void BeginMutation()
+        {
         }
 
         public void NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)

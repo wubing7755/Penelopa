@@ -4,11 +4,14 @@ namespace Penelopa.Core.Services;
 
 /// <summary>
 /// Undo/redo history for the document. A snapshot captures the primitive
-/// tree by reference plus every primitive's property values, container
-/// children, and the selection; applying a snapshot restores those values
-/// and rebuilds the root list through <see cref="IPrimitiveService.ReplaceAll"/>.
-/// Snapshots are taken BEFORE a mutation (gesture start, structural change),
-/// so undo restores the pre-gesture state.
+/// tree by reference plus every primitive's property values and container
+/// children; applying a snapshot restores those values and rebuilds the root
+/// list through <see cref="IPrimitiveService.ReplaceAll"/>. Selection is UI
+/// state, not document state: it is never captured, and undo/redo preserves
+/// the live selection filtered to the primitives that survive the restore.
+/// Snapshots are taken only BEFORE a real mutation (a structural change or
+/// the start of a drag/resize gesture), so non-mutating clicks never create
+/// an undo entry.
 /// </summary>
 public sealed class DocumentHistory
 {
@@ -32,7 +35,7 @@ public sealed class DocumentHistory
     /// </summary>
     public void Capture()
     {
-        _undoStack.Push(DocumentSnapshot.Capture(_service.GetAll().ToList(), _service.GetSelection().ToList()));
+        _undoStack.Push(DocumentSnapshot.Capture(_service.GetAll().ToList()));
         _redoStack.Clear();
     }
 
@@ -44,7 +47,7 @@ public sealed class DocumentHistory
             return;
         }
 
-        var current = DocumentSnapshot.Capture(_service.GetAll().ToList(), _service.GetSelection().ToList());
+        var current = DocumentSnapshot.Capture(_service.GetAll().ToList());
         var target = _undoStack.Pop();
         _redoStack.Push(current);
         target.Apply(_service);
@@ -58,7 +61,7 @@ public sealed class DocumentHistory
             return;
         }
 
-        var current = DocumentSnapshot.Capture(_service.GetAll().ToList(), _service.GetSelection().ToList());
+        var current = DocumentSnapshot.Capture(_service.GetAll().ToList());
         var target = _redoStack.Pop();
         _undoStack.Push(current);
         target.Apply(_service);
@@ -78,21 +81,18 @@ public sealed class DocumentSnapshot
     private readonly List<Primitive> _roots;
     private readonly Dictionary<Guid, Dictionary<string, object>> _props;
     private readonly Dictionary<Guid, List<Primitive>> _children;
-    private readonly List<Primitive> _selection;
 
     private DocumentSnapshot(
         List<Primitive> roots,
         Dictionary<Guid, Dictionary<string, object>> props,
-        Dictionary<Guid, List<Primitive>> children,
-        List<Primitive> selection)
+        Dictionary<Guid, List<Primitive>> children)
     {
         _roots = roots;
         _props = props;
         _children = children;
-        _selection = selection;
     }
 
-    public static DocumentSnapshot Capture(IReadOnlyList<Primitive> roots, IReadOnlyList<Primitive> selection)
+    public static DocumentSnapshot Capture(IReadOnlyList<Primitive> roots)
     {
         var props = new Dictionary<Guid, Dictionary<string, object>>();
         var children = new Dictionary<Guid, List<Primitive>>();
@@ -101,7 +101,7 @@ public sealed class DocumentSnapshot
             CaptureNode(root, props, children);
         }
 
-        return new DocumentSnapshot(roots.ToList(), props, children, selection.ToList());
+        return new DocumentSnapshot(roots.ToList(), props, children);
     }
 
     private static void CaptureNode(
@@ -112,19 +112,9 @@ public sealed class DocumentSnapshot
         var values = new Dictionary<string, object>();
         foreach (var prop in primitive.Props)
         {
-            if (ReferenceEquals(prop, primitive.ColorKey))
+            if (prop.GetBoxedValue() is { } value)
             {
-                continue;
-            }
-
-            switch (prop)
-            {
-                case FloatPropValue fp: values[prop.Name] = fp.Value; break;
-                case DoublePropValue dp: values[prop.Name] = dp.Value; break;
-                case IntPropValue ip: values[prop.Name] = ip.Value; break;
-                case BoolPropValue bp: values[prop.Name] = bp.Value; break;
-                case StringPropValue sp: values[prop.Name] = sp.Value; break;
-                case UintPropValue up: values[prop.Name] = up.Value; break;
+                values[prop.Name] = value;
             }
         }
 
@@ -140,24 +130,19 @@ public sealed class DocumentSnapshot
         }
     }
 
-    /// <summary>Restores this snapshot onto the service (roots, values, keys, selection).</summary>
+    /// <summary>Restores this snapshot onto the service (roots and property values).</summary>
     public void Apply(IPrimitiveService service)
     {
-        // Free keys of primitives that are in the live tree but not in this
-        // snapshot (undoing an Add drops those objects for good).
+        // Reconstruct this snapshot's node set from the CAPTURED structure
+        // (_children), not the live tree: container.Children has already
+        // diverged from the snapshot by the time Apply runs (the mutation this
+        // undo is rolling back already happened), so walking the live children
+        // would wrongly include nodes the snapshot does not own.
         var snapshotNodes = new List<Primitive>();
         var snapshotSet = new HashSet<Primitive>();
         foreach (var root in _roots)
         {
-            CollectNodes(root, snapshotNodes, snapshotSet);
-        }
-
-        foreach (var live in service.GetAll().ToList())
-        {
-            if (!snapshotSet.Contains(live))
-            {
-                ReleaseKeys(live);
-            }
+            CollectSnapshotNodes(root, snapshotNodes, snapshotSet);
         }
 
         // Restore container children (structure may have changed).
@@ -180,6 +165,11 @@ public sealed class DocumentSnapshot
             }
         }
 
+        // Preserve the live selection across the restore: selection is UI
+        // state and is not part of the snapshot, and ReplaceAll clears it, so
+        // remember it first and re-apply only the survivors afterwards.
+        var liveSelection = service.GetSelection().ToList();
+
         service.ReplaceAll(_roots, clearHistory: false);
 
         // Restore property values.
@@ -192,62 +182,30 @@ public sealed class DocumentSnapshot
 
             foreach (var prop in primitive.Props)
             {
-                if (ReferenceEquals(prop, primitive.ColorKey))
-                {
-                    continue;
-                }
-
                 if (!values.TryGetValue(prop.Name, out var value))
                 {
                     continue;
                 }
 
-                switch (prop)
-                {
-                    case FloatPropValue fp: fp.Value = Convert.ToSingle(value); break;
-                    case DoublePropValue dp: dp.Value = Convert.ToDouble(value); break;
-                    case IntPropValue ip: ip.Value = Convert.ToInt32(value); break;
-                    case BoolPropValue bp: bp.Value = Convert.ToBoolean(value); break;
-                    case StringPropValue sp: sp.Value = Convert.ToString(value) ?? string.Empty; break;
-                    case UintPropValue up: up.Value = Convert.ToUInt32(value); break;
-                }
+                prop.SetBoxedValue(value);
             }
         }
 
-        // Re-register color keys (ReplaceAll released the live tree's keys;
-        // restored primitives need fresh ones).
-        foreach (var primitive in snapshotNodes)
-        {
-            primitive.ColorKey.Value = ColorKeyManager.GenerateColorKey(primitive);
-        }
-
-        // Restore the selection by reference (the objects are the same).
-        service.SetSelectedRange(_selection.Where(snapshotSet.Contains));
+        // Re-apply the live selection, keeping only primitives that survive
+        // this restore (primitives added by the undone mutation drop out).
+        service.SetSelectedRange(liveSelection.Where(snapshotSet.Contains));
     }
 
-    private static void CollectNodes(Primitive root, List<Primitive> nodes, HashSet<Primitive> set)
+    private void CollectSnapshotNodes(Primitive root, List<Primitive> nodes, HashSet<Primitive> set)
     {
         nodes.Add(root);
         set.Add(root);
-        if (root is Container container)
+        if (root is Container container && _children.TryGetValue(container.Id, out var savedChildren))
         {
-            foreach (var child in container.Children)
+            foreach (var child in savedChildren)
             {
-                CollectNodes(child, nodes, set);
+                CollectSnapshotNodes(child, nodes, set);
             }
         }
-    }
-
-    private static void ReleaseKeys(Primitive root)
-    {
-        if (root is Container container)
-        {
-            foreach (var child in container.Children)
-            {
-                ReleaseKeys(child);
-            }
-        }
-
-        ColorKeyManager.ReleaseColorKey(root.ColorKey.Value);
     }
 }

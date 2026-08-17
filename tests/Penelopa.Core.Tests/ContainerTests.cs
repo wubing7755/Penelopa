@@ -165,4 +165,22 @@ public class ContainerTests
         Assert.DoesNotContain(flip.OffsetX, flip.Props);
         Assert.DoesNotContain(flip.Rotation, flip.Props);
     }
+
+    [Fact]
+    public void FlipContainer_ZeroScale_RemainsInvertible()
+    {
+        var container = Container.CreateFlip("f", flipX: true, flipY: false);
+        var child = new Rectangle();
+        container.AddChild(child);
+
+        // A user-typed zero scale must not make the local transform singular:
+        // Transform.Invert() throws when the determinant drops below 1e-6,
+        // which would crash child drag/resize.
+        container.ScaleX.Value = 0f;
+
+        var transform = container.LocalTransform;
+        Assert.True(MathF.Abs(transform.A * transform.D - transform.B * transform.C) >= 1e-6f);
+
+        child.Translate(5f, 5f); // would throw InvalidOperationException without the floor
+    }
 }
