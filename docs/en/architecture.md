@@ -43,16 +43,18 @@ SkiaSharp rendering extracted so hit-testing logic can be unit tested without
 a browser:
 
 - `CanvasRenderer` owns a draw bitmap and an off-screen hit bitmap sized to
-  the target canvas (`EnsureBuffersFor` rebuilds them when the canvas
-  `DeviceClipBounds` changes, so the editor canvas fills its host panel).
-  `Render` clears both, applies the y-flip world transform
-  (`Translate(0, height)` + `Scale(1, -1)`), paints every primitive (visible
-  color on the draw bitmap, color key on the hit bitmap), then blits the
-  result and draws the axis indicator.
-- `HitTest(screenX, screenY)` reads the hit bitmap pixel and resolves the
-  color key back to a primitive. Screen coordinates are the browser's
-  top-left origin; the y-flip means a world point `(x, y)` renders at screen
-  `(x, height - y)`. Coordinates outside the bitmap return null.
+  the render target reported by the host (`Render` receives the SKGLView
+  `e.Info` size, so the canvas fills its host panel at any display DPI).
+  Both bitmaps share one `ViewTransform` (y-flip world transform scaled by
+  the device pixel ratio); `Render` clears both, paints every primitive
+  (visible color on the draw bitmap, color key on the hit bitmap), then
+  blits the result and draws the axis indicator.
+- `ViewTransform` maps world coordinates (model space, Y up) to view pixels
+  (Y down) at physical resolution: one world unit equals one CSS pixel, so
+  the render target is `devicePixelRatio` times the CSS size. It is the
+  single extension point for future zoom/pan.
+- `HitTest(cssX, cssY)` converts browser CSS coordinates through the shared
+  `ViewTransform` and resolves the color-key pixel back to a primitive.
 
 ### Penelopa (WASM app)
 
@@ -77,9 +79,12 @@ a browser:
   with Adjacent activation, and the empty collapsed groups are persistent
   with no selected item.
 - `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
-  `IgnorePixelScaling=true`, fills the panel) and wires `OnPaintSurface` →
-  `CanvasRenderer.Render`, plus `mousedown` → `HitTest` → selection
-  (Ctrl-click appends).
+  physical-resolution rendering via the default `IgnorePixelScaling=false`,
+  fills the panel) and wires `OnPaintSurface` → `CanvasRenderer.Render` with
+  the event's `e.Info` size and the current `devicePixelRatio`, plus
+  `mousedown` → `HitTest` → selection (Ctrl-click appends). A small JS
+  helper (`wwwroot/js/penelopa.js`) watches `devicePixelRatio` changes
+  (matchMedia) so moves across displays with different DPI stay in sync.
 - `ToolPanel.razor` exposes Add (Circle/Rectangle/Triangle) and Align
   (six directions) actions.
 - `PrimitiveTreePanel.razor` lists all primitives; clicking selects.

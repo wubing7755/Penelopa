@@ -30,8 +30,16 @@ src/Penelopa.Core                          图元模型 + 对齐算法
 
 抽取 SkiaSharp 渲染，使命中检测逻辑无需浏览器即可单元测试：
 
-- `CanvasRenderer` 持有一张绘制位图和一张离屏命中位图，尺寸跟随目标画布（`EnsureBuffersFor` 在画布 `DeviceClipBounds` 变化时重建，因此编辑器画布填满宿主面板）。`Render` 清空两者，应用 y-flip 世界变换（`Translate(0, height)` + `Scale(1, -1)`），绘制每个图元（可见颜色画到绘制位图、颜色键画到命中位图），然后 blit 结果并绘制坐标轴指示。
-- `HitTest(screenX, screenY)` 读取命中位图像素并把颜色键解析回图元。屏幕坐标是浏览器的左上原点；y-flip 意味着世界点 `(x, y)` 渲染在屏幕 `(x, height - y)`。位图外的坐标返回 null。
+- `CanvasRenderer` 持有一张绘制位图和一张离屏命中位图，尺寸跟随宿主上报的
+  渲染目标（`Render` 接收 SKGLView 的 `e.Info` 尺寸，因此画布在任何显示
+  DPI 下都填满宿主面板）。两张位图共享同一个 `ViewTransform`（y-flip 世界
+  变换并按设备像素比缩放）；`Render` 清空两者，绘制每个图元（可见颜色画到
+  绘制位图、颜色键画到命中位图），然后 blit 结果并绘制坐标轴指示。
+- `ViewTransform` 把世界坐标（模型空间，Y 向上）映射到视图像素（Y 向下），
+  以物理分辨率渲染：1 个世界单位等于 1 个 CSS 像素，因此渲染目标尺寸为
+  CSS 尺寸乘以 `devicePixelRatio`。它是未来缩放/平移的唯一扩展点。
+- `HitTest(cssX, cssY)` 通过共享的 `ViewTransform` 换算浏览器 CSS 坐标，
+  并把颜色键像素解析回图元。
 
 ### Penelopa（WASM 应用）
 
@@ -50,7 +58,12 @@ src/Penelopa.Core                          图元模型 + 对齐算法
   （`SplitNode` / `GroupNode` / `DockItem` 数组与工具栏状态），复刻声明式
   缺省值：内部停靠区与底部停靠区使用 0.5 比例基准，文档组使用 Scroll
   溢出与 Adjacent 激活，空折叠组为 Persistent 且无选中项。
-- `CanvasPanel.razor` 承载 `SKGLView`（`EnableRenderLoop=true`、`IgnorePixelScaling=true`，填满面板），接线 `OnPaintSurface` → `CanvasRenderer.Render`，以及 `mousedown` → `HitTest` → 选择（Ctrl 点击追加）。
+- `CanvasPanel.razor` 承载 `SKGLView`（`EnableRenderLoop=true`，默认
+  `IgnorePixelScaling=false` 物理分辨率渲染，填满面板），接线
+  `OnPaintSurface` → `CanvasRenderer.Render`（传事件的 `e.Info` 尺寸与当前
+  `devicePixelRatio`），以及 `mousedown` → `HitTest` → 选择（Ctrl 点击追加）。
+  `wwwroot/js/penelopa.js` 用 matchMedia 监听 `devicePixelRatio` 变化，跨
+  DPI 显示器拖动时保持同步。
 - `ToolPanel.razor` 提供 Add（Circle/Rectangle/Triangle）与 Align（六方向）操作。
 - `PrimitiveTreePanel.razor` 列出全部图元，点击选择。
 - `PropertyPanel.razor` 通过 `Panels/Props/` 中的类型化输入组件渲染选中图元的 `PropValue` 属性包。
