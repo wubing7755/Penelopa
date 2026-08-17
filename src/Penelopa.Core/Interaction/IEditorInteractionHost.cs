@@ -29,8 +29,14 @@ public interface IEditorInteractionHost
     void ClearSelection();
 
     /// <summary>
+    /// Pans the view by a world-space delta (the host converts to CSS pixels
+    /// using the current zoom). Used by the empty-space drag gesture.
+    /// </summary>
+    void PanByWorld(float deltaX, float deltaY);
+
+    /// <summary>
     /// Announces that the given primitives' geometry changed (drag/resize
-    /// commit), so property/tree panels refresh. Called once per gesture.
+    /// commit), so panels can refresh.
     /// </summary>
     void NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives);
 }

@@ -52,10 +52,14 @@ a browser:
   overlay (bounding box plus four corner handles at a fixed 8px screen
   size). The hit buffer is drawn without antialiasing so 1px edges stay
   hittable.
-- `ViewTransform` maps world coordinates (model space, Y up) to view pixels
-  (Y down) at physical resolution: one world unit equals one CSS pixel, so
-  the render target is `devicePixelRatio` times the CSS size. It is the
-  single extension point for future zoom/pan.
+- `ViewTransform` maps world coordinates (model space, Y up, origin at the
+  canvas center) to view pixels (Y down) at physical resolution: one world
+  unit equals one CSS pixel at 100% zoom, so the render target is
+  `devicePixelRatio` times the CSS size. It also carries the view zoom
+  (wheel around the pointer) and pan (empty-space drag), so rendering, the
+  selection overlay, and hit testing all follow the same transform. The
+  color-key hit buffer indexes physical pixels, so a CSS pointer position
+  maps through the same path that positioned the content at any zoom.
 - `HitTest(cssX, cssY)` converts browser CSS coordinates through the shared
   `ViewTransform` and resolves the color-key pixel back to a primitive.
 
@@ -82,19 +86,64 @@ a browser:
   with Adjacent activation, and the empty collapsed groups are persistent
   with no selected item.
 - `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
-  physical-resolution rendering via the default `IgnorePixelScaling=false`)
-  inside a scrollable content box (`.penelopa-canvas-scroll` + minimum
-  content size), so shrinking the window shows scrollbars instead of
-  clipping the drawing area. It wires `OnPaintSurface` →
+  physical-resolution rendering via the default `IgnorePixelScaling=false`);
+  the canvas element fills the viewport (no fixed content size), and the
+  view itself is managed by `ViewTransform` zoom/pan: wheel zooms around
+  the pointer, dragging empty space pans, and the Fit button
+  (`renderer.FitToContent`) centers the content in the viewport, so
+  scrollbars are no longer needed. It wires `OnPaintSurface` →
   `CanvasRenderer.Render` with the event's `e.Info` size and the current
   `devicePixelRatio`, plus `mousedown` → `HitTest` → selection (Ctrl-click
   appends). A small JS helper (`wwwroot/js/penelopa.js`) watches
   `devicePixelRatio` changes (matchMedia) so moves across displays with
   different DPI stay in sync, and hosts the pointer layer (capture,
   canvas-relative CSS coordinates, synthesized-mouse suppression, rAF
-  throttling) that reports semantic callbacks into the interaction
-  controller. Browser `OffsetX/Y` are relative to the canvas element, so
-  scrolling does not affect hit testing.
+  throttling, wheel zoom) that reports semantic callbacks into the
+  interaction controller. Browser `OffsetX/Y` are relative to the canvas
+  element, so viewport changes do not affect hit testing.
+
+### Containers and drill-down
+
+`Container` (Core) groups children and applies an affine `LocalTransform` —
+the A661-style rotation / offset / flip containers are factory variants of
+the same type. The container has no visible shape; children render inside
+its transform (`DrawNode` applies the matrix to both the visible and hit
+canvases under a Save/Restore, so color-key hit testing matches what is
+drawn). Children hold local coordinates; `Primitive.Translate` /
+`SetBounds` / `ContainsWorldPoint` convert world input through the parent
+chain (`Container.ToLocalVector` / `ToLocalPoint` / `ToLocalBounds`), so
+dragging inside a rotated container follows the pointer and resizing keeps
+the fixed corner anchored. The container's world box is the AABB of its
+transformed children, so selection boxes and alignment work unchanged;
+axis-aligned containers resize non-uniformly, rotated ones scale
+uniformly to avoid matrix shear.
+
+Drill-down selection (hit-through) collects the candidates at a point with
+`CanvasRenderer.PickAll`: the topmost color-key primitive plus its ancestor
+chain, ordered root → deepest leaf (the confirmed direction). The
+`EditorInteractionController` starts each click at the outermost candidate
+and advances the index on repeated clicks at the same spot (within 4 world
+units and 500 ms), stopping at the deepest leaf; moving away or clicking
+empty space resets the context. Ctrl-click skips drilling (append/toggle),
+the tree panel selects any ancestor directly, and ESC cancels gestures.
+
+### History and persistence
+
+`PrimitiveService` owns a `DocumentHistory` (snapshot-based undo/redo).
+A snapshot captures the primitive tree by reference plus every primitive's
+property values, container children, and the selection; snapshots are taken
+before each structural change (`Add`/`Remove`/`AddToContainer`) and before
+each canvas gesture, so undo restores the pre-mutation state. Applying a
+snapshot rebuilds the root list, restores values and children, re-registers
+color keys, and re-selects by reference. Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y)
+drive undo/redo through the pointer layer's key handling.
+
+`DocumentSerializer` round-trips the document to JSON: primitives are
+stored by type with their property values (color keys excluded — they are
+rebuilt on load), containers nest their children, and the selection is
+saved as primitive ids so it re-resolves against the rebuilt tree. The
+Tools panel's Save/Load buttons persist the document to `localStorage`
+(`penelopa.document`).
 
 ### Interaction
 

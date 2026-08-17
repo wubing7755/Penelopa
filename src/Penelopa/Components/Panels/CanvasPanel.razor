@@ -16,6 +16,10 @@
         <SKGLView EnableRenderLoop="true"
                   OnPaintSurface="OnPaintSurface"
                   style="width: 100%; height: 100%;" />
+        <button type="button"
+                class="penelopa-canvas-fit"
+                title="Fit content to viewport"
+                @onclick="FitCanvas">Fit</button>
     </div>
 </div>
 
@@ -25,6 +29,8 @@
     private readonly List<Primitive> _selection = new();
     private readonly EditorInteractionController _controller;
     private double _dpr = 1;
+    private float _lastPanCssDx;
+    private float _lastPanCssDy;
     private DotNetObjectReference<CanvasPanel>? _dprRef;
     private ElementReference _canvasElement;
     private IJSObjectReference? _pointerHandle;
@@ -78,6 +84,8 @@
     public void OnPointerDown(double x, double y, double button, bool ctrl, bool shift, long pointerId)
     {
         _renderer.SetDevicePixelRatio((float)_dpr);
+        // Capture the pre-gesture state so drag/resize can be undone.
+        PrimitiveService.CaptureForGesture();
         var cssX = (float)x;
         var cssY = (float)y;
         var world = _renderer.CssToWorld(cssX, cssY);
@@ -104,6 +112,31 @@
 
     [JSInvokable]
     public void OnEscape() => _controller.Cancel();
+
+    [JSInvokable]
+    public void OnUndo() => PrimitiveService.Undo();
+
+    [JSInvokable]
+    public void OnRedo() => PrimitiveService.Redo();
+
+    [JSInvokable]
+    public void OnWheel(double x, double y, double deltaY)
+    {
+        var current = _renderer.CurrentViewTransform.Zoom;
+        float factor = deltaY < 0 ? 1.1f : 1f / 1.1f;
+        float newZoom = Math.Clamp(current * factor, 0.05f, 8f);
+        if (MathF.Abs(newZoom - current) < 1e-4f)
+        {
+            return;
+        }
+
+        _renderer.ZoomAt((float)x, (float)y, newZoom);
+    }
+
+    private void FitCanvas()
+    {
+        _renderer.FitToContent(_primitives);
+    }
 
     private void AddPrimitive(Primitive primitive)
     {
@@ -157,6 +190,23 @@
 
     void IEditorInteractionHost.ClearSelection()
         => PrimitiveService.ClearSelection();
+
+    void IEditorInteractionHost.PanByWorld(float deltaX, float deltaY)
+    {
+        // The controller reports world-space deltas, but the css→world
+        // conversion already includes the current pan, so consecutive
+        // gestures accumulate an error (each step loses the previous step's
+        // displacement — the jitter). Compensate with the last CSS pan to get
+        // the pure pointer displacement:
+        //   cssDx = deltaX * zoom + lastCssDx
+        //   cssDy = -deltaY * zoom + lastCssDy   (world Y up, screen Y down)
+        float zoom = _renderer.CurrentViewTransform.Zoom;
+        float cssDx = deltaX * zoom + _lastPanCssDx;
+        float cssDy = -deltaY * zoom + _lastPanCssDy;
+        _renderer.PanBy(cssDx, cssDy);
+        _lastPanCssDx = cssDx;
+        _lastPanCssDy = cssDy;
+    }
 
     void IEditorInteractionHost.NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)
         => PrimitiveService.NotifyPrimitivesChanged(primitives);

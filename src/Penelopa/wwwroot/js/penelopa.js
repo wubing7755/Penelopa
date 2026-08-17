@@ -57,8 +57,13 @@ window.penelopa.attachPointer = function (canvasEl, dotNetRef) {
     }
 
     function onPointerDown(e) {
-        if (state.interacting) {
+        // Let overlay controls (Fit button) handle their own clicks: the
+        // synthesized-mouse suppression below must not eat their events.
+        if (e.target && e.target.closest && e.target.closest('.penelopa-canvas-fit')) {
             return;
+        }
+        if (state.interacting) {
+            return; // already in an interaction
         }
         if (e.pointerType !== 'mouse' && !e.isPrimary) {
             return; // secondary touch pointers do not drive editing
@@ -152,10 +157,33 @@ window.penelopa.attachPointer = function (canvasEl, dotNetRef) {
         }
     }
 
-    function onKeyEscape(e) {
+    function onKeyDown(e) {
         if (e.key === 'Escape') {
             dotNetRef.invokeMethodAsync('OnEscape');
+            return;
         }
+        var mod = e.ctrlKey || e.metaKey;
+        var key = e.key.toLowerCase();
+        if (mod && !e.shiftKey && key === 'z') {
+            e.preventDefault();
+            dotNetRef.invokeMethodAsync('OnUndo');
+            return;
+        }
+        if (mod && (key === 'y' || (e.shiftKey && key === 'z'))) {
+            e.preventDefault();
+            dotNetRef.invokeMethodAsync('OnRedo');
+        }
+    }
+
+    function onWheel(e) {
+        // Only Ctrl+wheel zooms (the browser convention); plain wheel is left
+        // to the page/container so it can scroll.
+        if (!e.ctrlKey) {
+            return;
+        }
+        e.preventDefault();
+        var pos = toCss(e);
+        dotNetRef.invokeMethodAsync('OnWheel', pos.x, pos.y, e.deltaY);
     }
 
     canvasEl.addEventListener('pointerdown', onPointerDown);
@@ -163,9 +191,10 @@ window.penelopa.attachPointer = function (canvasEl, dotNetRef) {
     canvasEl.addEventListener('pointerup', onPointerUp);
     canvasEl.addEventListener('pointercancel', onCancel);
     canvasEl.addEventListener('lostpointercapture', onLostPointerCapture);
+    canvasEl.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('blur', onWindowBlur);
     document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('keydown', onKeyEscape);
+    window.addEventListener('keydown', onKeyDown);
 
     return {
         dispose: function () {
@@ -174,9 +203,10 @@ window.penelopa.attachPointer = function (canvasEl, dotNetRef) {
             canvasEl.removeEventListener('pointerup', onPointerUp);
             canvasEl.removeEventListener('pointercancel', onCancel);
             canvasEl.removeEventListener('lostpointercapture', onLostPointerCapture);
+            canvasEl.removeEventListener('wheel', onWheel);
             window.removeEventListener('blur', onWindowBlur);
             document.removeEventListener('visibilitychange', onVisibilityChange);
-            window.removeEventListener('keydown', onKeyEscape);
+            window.removeEventListener('keydown', onKeyDown);
             canvasEl.classList.remove('penelopa-dragging');
         },
     };

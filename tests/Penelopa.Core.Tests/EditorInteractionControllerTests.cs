@@ -32,7 +32,39 @@ public class EditorInteractionControllerTests
 
         controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
 
+        // Pressing empty space enters Pressed (a pan candidate) and clears
+        // the selection immediately; a plain click commits as a click.
+        Assert.Equal(ControllerState.Pressed, controller.State);
+        Assert.True(host.Cleared);
+    }
+
+    [Fact]
+    public void EmptySpaceDrag_PansView()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+
+        controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
+        controller.PointerMove(new Point(80f, 50f));   // crosses the threshold
+        controller.PointerMove(new Point(100f, 60f));  // incremental pan
+        controller.PointerUp(new Point(100f, 60f));
+
         Assert.Equal(ControllerState.Idle, controller.State);
+        Assert.Empty(host.Notified); // panning does not commit geometry
+        Assert.Contains(new Point(30f, 0f), host.PanCalls);
+        Assert.Contains(new Point(20f, 10f), host.PanCalls);
+    }
+
+    [Fact]
+    public void EmptySpaceClick_DoesNotPan()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+
+        controller.PointerDown(new Point(50f, 50f), default, ctrl: false);
+        controller.PointerUp(new Point(50f, 50f));
+
+        Assert.Empty(host.PanCalls);
         Assert.True(host.Cleared);
     }
 
@@ -174,6 +206,44 @@ public class EditorInteractionControllerTests
     }
 
     [Fact]
+    public void CtrlClick_InsideContainer_AppendsOutermostCandidate()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+        var container = Container.CreateOffset("c", 0f, 0f);
+        var child = new Rectangle { PosX = { Value = 0f }, PosY = { Value = 0f }, Width = { Value = 10f }, Height = { Value = 10f } };
+        container.AddChild(child);
+        var existing = Rect(50f, 50f);
+        host.SelectRange(container, existing); // container already in the multi-selection
+
+        // Ctrl-click the child: the outermost candidate (the container) is
+        // already selected → toggled off, not the child.
+        var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
+        controller.PointerDown(new Point(5f, 5f), hit, ctrl: true);
+
+        Assert.Equal(ControllerState.Idle, controller.State);
+        Assert.Contains(existing, host.Selection);
+        Assert.DoesNotContain(container, host.Selection);
+        Assert.DoesNotContain(child, host.Selection);
+    }
+
+    [Fact]
+    public void CtrlClick_InsideContainer_WhenContainerUnselected_AppendsContainer()
+    {
+        var host = new TestHost();
+        var controller = new EditorInteractionController(host);
+        var container = Container.CreateOffset("c", 0f, 0f);
+        var child = new Rectangle { PosX = { Value = 0f }, PosY = { Value = 0f }, Width = { Value = 10f }, Height = { Value = 10f } };
+        container.AddChild(child);
+
+        var hit = new HitTestResult { Primitive = child, Candidates = new Primitive[] { container, child } };
+        controller.PointerDown(new Point(5f, 5f), hit, ctrl: true);
+
+        Assert.Contains(container, host.Selection);
+        Assert.DoesNotContain(child, host.Selection);
+    }
+
+    [Fact]
     public void PressOnSelectedMemberOfMultiSelection_CollapsesOnClick()
     {
         var host = new TestHost();
@@ -234,6 +304,7 @@ public class EditorInteractionControllerTests
         public List<Primitive> Selection => _selection;
         public bool Cleared { get; private set; }
         public List<Primitive> Notified { get; } = new();
+        public List<Point> PanCalls { get; } = new();
 
         public void Select(Primitive primitive)
         {
@@ -281,6 +352,11 @@ public class EditorInteractionControllerTests
         {
             Cleared = true;
             _selection.Clear();
+        }
+
+        public void PanByWorld(float deltaX, float deltaY)
+        {
+            PanCalls.Add(new Point(deltaX, deltaY));
         }
 
         public void NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives)

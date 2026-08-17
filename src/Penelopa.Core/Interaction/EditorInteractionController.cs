@@ -40,11 +40,25 @@ public sealed class EditorInteractionController
     private Point _lastWorld;
     private float _dragTotalDx;
     private float _dragTotalDy;
+    private bool _isPanGesture;
 
     // Resize snapshot.
     private Primitive? _resizeTarget;
     private Box _resizeOriginalBounds;
     private ResizeHandle _resizeHandle;
+
+    // Drill-down snapshot: repeated clicks at the same spot advance the
+    // candidate index from the outermost container toward the deepest leaf.
+    private Point? _lastClickPosition;
+    private DateTime _lastClickTime;
+    private IReadOnlyList<Primitive> _drillCandidates = Array.Empty<Primitive>();
+    private int _drillIndex;
+
+    // Empty-space press that may become a pan gesture.
+    private bool _panPending;
+
+    private const float DrillSlopWorld = 4f;
+    private static readonly TimeSpan DrillInterval = TimeSpan.FromMilliseconds(500);
 
     /// <summary>Gets the current controller state (for tests and diagnostics).</summary>
     public ControllerState State => _state;
@@ -75,15 +89,22 @@ public sealed class EditorInteractionController
             var primitive = hit.Primitive;
             if (ctrl)
             {
-                if (_host.IsSelected(primitive))
+                // Ctrl-click follows the drill direction too: the outermost
+                // candidate is appended (or toggled off when already
+                // selected), consistent with plain-click selection.
+                var candidates = hit.Candidates is { Count: > 0 }
+                    ? hit.Candidates
+                    : new[] { primitive };
+                var ctrlTarget = candidates[0];
+                if (_host.IsSelected(ctrlTarget))
                 {
-                    _host.ToggleSelected(primitive);
+                    _host.ToggleSelected(ctrlTarget);
                     _state = ControllerState.Idle;
                     return;
                 }
 
-                _host.AppendSelected(primitive);
-                _pressHit = primitive;
+                _host.AppendSelected(ctrlTarget);
+                _pressHit = ctrlTarget;
                 _pressDeferredCommit = false;
                 _state = ControllerState.Pressed;
                 return;
@@ -100,8 +121,12 @@ public sealed class EditorInteractionController
                 return;
             }
 
-            _host.SetSelected(primitive);
-            _pressHit = primitive;
+            // Drill-down selection: the first click picks the outermost
+            // candidate (the root container when nested), and repeated
+            // clicks at the same spot descend toward the deepest leaf.
+            var target = SelectDrillTarget(world, hit);
+            _host.SetSelected(target);
+            _pressHit = target;
             _pressDeferredCommit = false;
             _state = ControllerState.Pressed;
             return;
@@ -116,8 +141,14 @@ public sealed class EditorInteractionController
             return;
         }
 
+        // Pressing empty space clears the selection; a drag that crosses the
+        // threshold pans the view instead.
         _host.ClearSelection();
-        _state = ControllerState.Idle;
+        ClearDrillContext();
+        _pressHit = null;
+        _pressDeferredCommit = false;
+        _panPending = true;
+        _state = ControllerState.Pressed;
     }
 
     /// <summary>Handles a pointer move at a world position.</summary>
@@ -137,11 +168,18 @@ public sealed class EditorInteractionController
             case ControllerState.Dragging:
                 float dx = world.X - _lastWorld.X;
                 float dy = world.Y - _lastWorld.Y;
-                _dragTotalDx += dx;
-                _dragTotalDy += dy;
-                foreach (var item in _dragItems)
+                if (_isPanGesture)
                 {
-                    item.Translate(dx, dy);
+                    _host.PanByWorld(dx, dy);
+                }
+                else
+                {
+                    _dragTotalDx += dx;
+                    _dragTotalDy += dy;
+                    foreach (var item in _dragItems)
+                    {
+                        item.Translate(dx, dy);
+                    }
                 }
 
                 _lastWorld = world;
@@ -171,7 +209,11 @@ public sealed class EditorInteractionController
                 break;
 
             case ControllerState.Dragging:
-                _host.NotifyPrimitivesChanged(_dragItems);
+                if (!_isPanGesture)
+                {
+                    _host.NotifyPrimitivesChanged(_dragItems);
+                }
+
                 break;
 
             case ControllerState.Resizing:
@@ -195,9 +237,12 @@ public sealed class EditorInteractionController
         switch (_state)
         {
             case ControllerState.Dragging:
-                foreach (var item in _dragItems)
+                if (!_isPanGesture)
                 {
-                    item.Translate(-_dragTotalDx, -_dragTotalDy);
+                    foreach (var item in _dragItems)
+                    {
+                        item.Translate(-_dragTotalDx, -_dragTotalDy);
+                    }
                 }
 
                 break;
@@ -215,8 +260,60 @@ public sealed class EditorInteractionController
         ResetGesture();
     }
 
+    /// <summary>
+    /// Resolves the drill-down target: advances the candidate index when the
+    /// click repeats at the same spot on the same candidate chain, otherwise
+    /// restarts at the outermost candidate.
+    /// </summary>
+    private Primitive SelectDrillTarget(Point world, HitTestResult hit)
+    {
+        var candidates = hit.Candidates is { Count: > 0 } ? hit.Candidates : new[] { hit.Primitive! };
+        var now = DateTime.UtcNow;
+
+        bool sameChain = _drillCandidates.Count > 0
+            && ReferenceEquals(candidates[^1], _drillCandidates[^1]);
+        bool sameSpot = _lastClickPosition is not null
+            && MathF.Abs(world.X - _lastClickPosition.Value.X) <= DrillSlopWorld
+            && MathF.Abs(world.Y - _lastClickPosition.Value.Y) <= DrillSlopWorld;
+        bool withinInterval = now - _lastClickTime <= DrillInterval;
+
+        if (sameChain && sameSpot && withinInterval && _drillIndex < candidates.Count - 1)
+        {
+            _drillIndex++;
+        }
+        else if (!(sameChain && sameSpot && withinInterval))
+        {
+            _drillIndex = 0;
+        }
+
+        _lastClickPosition = world;
+        _lastClickTime = now;
+        _drillCandidates = candidates;
+        return candidates[_drillIndex];
+    }
+
+    private void ClearDrillContext()
+    {
+        _lastClickPosition = null;
+        _drillCandidates = Array.Empty<Primitive>();
+        _drillIndex = 0;
+    }
+
     private void BeginDrag(Point world)
     {
+        if (_panPending)
+        {
+            // Empty-space drag pans the view; apply the full displacement
+            // from the press point so the content follows the pointer.
+            _isPanGesture = true;
+            float panDx = world.X - _pressStart.X;
+            float panDy = world.Y - _pressStart.Y;
+            _host.PanByWorld(panDx, panDy);
+            _lastWorld = world;
+            _state = ControllerState.Dragging;
+            return;
+        }
+
         _dragItems = _host.GetSelection().ToList();
 
         // Apply the full displacement from the press point so the selection
@@ -241,6 +338,8 @@ public sealed class EditorInteractionController
         _pressDeferredCommit = false;
         _dragItems = new List<Primitive>();
         _resizeTarget = null;
+        _panPending = false;
+        _isPanGesture = false;
         _state = ControllerState.Idle;
     }
 }

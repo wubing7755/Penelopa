@@ -73,8 +73,81 @@ public sealed class CanvasRenderer
         canvas.Clear(SKColors.Black);
         DrawPrimitives(primitives);
         canvas.DrawBitmap(_drawBitmap, 0, 0);
-        DrawCoordinateSystem(canvas);
         DrawSelectionOverlay(canvas, selection);
+    }
+
+    /// <summary>Gets the current view transform (zoom/pan state).</summary>
+    public ViewTransform CurrentViewTransform => _viewTransform;
+
+    /// <summary>Replaces the view transform (zoom/pan).</summary>
+    public void SetViewTransform(ViewTransform transform) => _viewTransform = transform;
+
+    /// <summary>
+    /// Zooms to <paramref name="newZoom"/> keeping the world point under the
+    /// CSS cursor fixed (wheel-zoom around the pointer).
+    /// </summary>
+    public void ZoomAt(float cssX, float cssY, float newZoom)
+    {
+        var view = _viewTransform.ScreenToView(cssX, cssY);
+        var world = _viewTransform.ViewToWorld(view.X, view.Y);
+
+        float halfW = _viewTransform.ViewWidth / (2f * _viewTransform.DevicePixelRatio);
+        float halfH = _viewTransform.ViewHeight / (2f * _viewTransform.DevicePixelRatio);
+        float panX = cssX - halfW - world.X * newZoom;
+        float panY = cssY - halfH + world.Y * newZoom;
+        _viewTransform = new ViewTransform(
+            _viewTransform.ViewWidth,
+            _viewTransform.ViewHeight,
+            _viewTransform.DevicePixelRatio,
+            newZoom,
+            panX,
+            panY);
+    }
+
+    /// <summary>Pans the view by a CSS-pixel delta.</summary>
+    public void PanBy(float cssDx, float cssDy)
+    {
+        _viewTransform = new ViewTransform(
+            _viewTransform.ViewWidth,
+            _viewTransform.ViewHeight,
+            _viewTransform.DevicePixelRatio,
+            _viewTransform.Zoom,
+            _viewTransform.PanX + cssDx,
+            _viewTransform.PanY + cssDy);
+    }
+
+    /// <summary>
+    /// Fits the content bounds into the viewport with padding, centering the
+    /// content (zoom may shrink or enlarge; empty content leaves the view
+    /// unchanged).
+    /// </summary>
+    public void FitToContent(IReadOnlyList<Primitive> primitives, float paddingCss = 40f)
+    {
+        if (primitives.Count == 0)
+        {
+            return;
+        }
+
+        var bounds = MergeBounds(primitives);
+        float viewportW = _viewTransform.ViewWidth / _viewTransform.DevicePixelRatio;
+        float viewportH = _viewTransform.ViewHeight / _viewTransform.DevicePixelRatio;
+        float contentW = MathF.Max(bounds.Width, 1f);
+        float contentH = MathF.Max(bounds.Height, 1f);
+
+        float zoom = MathF.Min(
+            viewportW / (contentW + 2f * paddingCss),
+            viewportH / (contentH + 2f * paddingCss));
+        zoom = Math.Clamp(zoom, 0.05f, 4f);
+
+        float panX = -bounds.CenterX * zoom;
+        float panY = bounds.CenterY * zoom;
+        _viewTransform = new ViewTransform(
+            _viewTransform.ViewWidth,
+            _viewTransform.ViewHeight,
+            _viewTransform.DevicePixelRatio,
+            zoom,
+            panX,
+            panY);
     }
 
     /// <summary>
@@ -189,7 +262,11 @@ public sealed class CanvasRenderer
         var primitive = HitTest(screenCssX, screenCssY);
         if (primitive is not null)
         {
-            return new HitTestResult { Primitive = primitive };
+            return new HitTestResult
+            {
+                Primitive = primitive,
+                Candidates = PickAll(screenCssX, screenCssY),
+            };
         }
 
         if (selection.Count > 1)
@@ -200,12 +277,39 @@ public sealed class CanvasRenderer
         return default;
     }
 
-    /// <summary>Converts a CSS screen point to world coordinates.</summary>
+    /// <summary>
+    /// Converts a CSS screen point to world coordinates.
+    /// </summary>
     public Point CssToWorld(float screenCssX, float screenCssY)
     {
         var view = _viewTransform.ScreenToView(screenCssX, screenCssY);
         var world = _viewTransform.ViewToWorld(view.X, view.Y);
         return new Point(world.X, world.Y);
+    }
+
+    /// <summary>
+    /// Collects the drill-down candidates at a point: the topmost primitive
+    /// from the color-key buffer plus its ancestor chain, ordered from the
+    /// outermost container (root) to the deepest leaf. This is the confirmed
+    /// drill direction: the first click selects the outermost container and
+    /// further clicks descend toward the inner shape.
+    /// </summary>
+    public IReadOnlyList<Primitive> PickAll(float screenCssX, float screenCssY)
+    {
+        var leaf = HitTest(screenCssX, screenCssY);
+        if (leaf is null)
+        {
+            return Array.Empty<Primitive>();
+        }
+
+        var chain = new List<Primitive>();
+        for (var node = leaf; node is not null; node = node.Parent)
+        {
+            chain.Add(node);
+        }
+
+        chain.Reverse();
+        return chain;
     }
 
     private void DrawSelectionOverlay(SKCanvas canvas, IReadOnlyList<Primitive>? selection)
@@ -239,11 +343,14 @@ public sealed class CanvasRenderer
 
     private void DrawSelectionBox(SKCanvas canvas, Box bounds, bool drawHandles)
     {
+        // World mode: one world unit equals one CSS pixel * Zoom, so dividing
+        // by Zoom keeps the outline width and handle size fixed on screen.
+        float inverseZoom = 1f / _viewTransform.Zoom;
         using var outline = new SKPaint
         {
             Color = SelectionColor,
             Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.5f,
+            StrokeWidth = 1.5f * inverseZoom,
             IsAntialias = true,
         };
         canvas.DrawRect(new SKRect(bounds.MinX, bounds.MinY, bounds.MaxX, bounds.MaxY), outline);
@@ -262,7 +369,7 @@ public sealed class CanvasRenderer
         foreach (var handle in SelectionBox.AllHandles)
         {
             var p = SelectionBox.HandlePoint(bounds, handle);
-            float half = HandleSizeCss / 2f;
+            float half = HandleSizeCss / 2f * inverseZoom;
             canvas.DrawRect(
                 new SKRect(p.X - half, p.Y - half, p.X + half, p.Y + half),
                 fill);
@@ -309,23 +416,13 @@ public sealed class CanvasRenderer
             _viewTransform.ApplyTo(canvas);
             _viewTransform.ApplyTo(hitCanvas);
 
+            // Axis indicator sits under the primitives; it never enters the
+            // hit buffer so the axes stay non-interactive.
+            DrawCoordinateSystem(canvas);
+
             foreach (var primitive in primitives)
             {
-                switch (primitive)
-                {
-                    case Circle circle:
-                        DrawCircle(canvas, circle);
-                        DrawHitCircle(hitCanvas, circle);
-                        break;
-                    case Rectangle rectangle:
-                        DrawRectangle(canvas, rectangle);
-                        DrawHitRectangle(hitCanvas, rectangle);
-                        break;
-                    case Triangle triangle:
-                        DrawTriangle(canvas, triangle);
-                        DrawHitTriangle(hitCanvas, triangle);
-                        break;
-                }
+                DrawNode(canvas, hitCanvas, primitive);
             }
         }
         finally
@@ -333,6 +430,67 @@ public sealed class CanvasRenderer
             canvas.Restore();
             hitCanvas.Restore();
         }
+    }
+
+    /// <summary>
+    /// Draws a primitive tree node. Containers save the canvas state, apply
+    /// their transform to BOTH canvases (visible and hit must stay
+    /// synchronized so the color-key hit test matches what is drawn), recurse
+    /// into children, then restore. Render order equals Z order: later nodes
+    /// cover earlier ones.
+    /// </summary>
+    private static void DrawNode(SKCanvas canvas, SKCanvas hitCanvas, Primitive node)
+    {
+        if (node is Container container)
+        {
+            var matrix = ToSkMatrix(container.LocalTransform);
+            canvas.Save();
+            hitCanvas.Save();
+            canvas.Concat(ref matrix);
+            hitCanvas.Concat(ref matrix);
+            foreach (var child in container.Children)
+            {
+                DrawNode(canvas, hitCanvas, child);
+            }
+
+            canvas.Restore();
+            hitCanvas.Restore();
+            return;
+        }
+
+        switch (node)
+        {
+            case Circle circle:
+                DrawCircle(canvas, circle);
+                DrawHitCircle(hitCanvas, circle);
+                break;
+            case Rectangle rectangle:
+                DrawRectangle(canvas, rectangle);
+                DrawHitRectangle(hitCanvas, rectangle);
+                break;
+            case Triangle triangle:
+                DrawTriangle(canvas, triangle);
+                DrawHitTriangle(hitCanvas, triangle);
+                break;
+        }
+    }
+
+    /// <summary>Converts the Core affine transform to an Skia matrix.</summary>
+    private static SKMatrix ToSkMatrix(Transform transform)
+    {
+        var matrix = new SKMatrix
+        {
+            ScaleX = transform.A,
+            SkewY = transform.B,
+            SkewX = transform.C,
+            ScaleY = transform.D,
+            TransX = transform.Tx,
+            TransY = transform.Ty,
+        };
+        matrix.Persp0 = 0;
+        matrix.Persp1 = 0;
+        matrix.Persp2 = 1;
+        return matrix;
     }
 
     private static void DrawCircle(SKCanvas canvas, Circle circle)
@@ -428,50 +586,46 @@ public sealed class CanvasRenderer
     }
 
     /// <summary>
-    /// Draws a small X/Y axis indicator at the bottom-left of the canvas.
+    /// Draws the coordinate system in world mode: the origin (0,0) is the
+    /// canvas center, so X and Y axes span the whole canvas and a center
+    /// marker makes the origin explicit.
     /// </summary>
     private void DrawCoordinateSystem(SKCanvas canvas)
     {
-        const float size = 30f;
-        const float offset = 10f;
+        float halfW = _viewTransform.ViewWidth / (2f * _viewTransform.DevicePixelRatio);
+        float halfH = _viewTransform.ViewHeight / (2f * _viewTransform.DevicePixelRatio);
 
+        canvas.DrawLine(new SKPoint(-halfW, 0f), new SKPoint(halfW, 0f), _axisPaint);
+        canvas.DrawLine(new SKPoint(0f, -halfH), new SKPoint(0f, halfH), _axisPaint);
+
+        const float marker = 2.5f;
+        canvas.DrawCircle(0f, 0f, marker, _arrowPaint);
+
+        const float arrowSize = 4f;
+        using (var xArrow = new SKPath())
+        {
+            xArrow.MoveTo(halfW, 0f);
+            xArrow.LineTo(halfW - arrowSize, -arrowSize);
+            xArrow.LineTo(halfW - arrowSize, arrowSize);
+            xArrow.Close();
+            canvas.DrawPath(xArrow, _arrowPaint);
+        }
+
+        using (var yArrow = new SKPath())
+        {
+            yArrow.MoveTo(0f, halfH);
+            yArrow.LineTo(-arrowSize, halfH - arrowSize);
+            yArrow.LineTo(arrowSize, halfH - arrowSize);
+            yArrow.Close();
+            canvas.DrawPath(yArrow, _arrowPaint);
+        }
+
+        // Text renders upside down under the world y-flip; flip once so the
+        // labels read normally.
         canvas.Save();
-        try
-        {
-            _viewTransform.ApplyTo(canvas);
-
-            canvas.DrawLine(offset, offset, offset + size, offset, _axisPaint);
-            canvas.DrawLine(offset, offset, offset, offset + size, _axisPaint);
-
-            const float arrowSize = 4f;
-            using (var path = new SKPath())
-            {
-                path.MoveTo(offset + size, offset);
-                path.LineTo(offset + size - arrowSize, offset - arrowSize);
-                path.LineTo(offset + size - arrowSize, offset + arrowSize);
-                path.Close();
-                canvas.DrawPath(path, _arrowPaint);
-            }
-
-            using (var path = new SKPath())
-            {
-                path.MoveTo(offset, offset + size);
-                path.LineTo(offset - arrowSize, offset + size - arrowSize);
-                path.LineTo(offset + arrowSize, offset + size - arrowSize);
-                path.Close();
-                canvas.DrawPath(path, _arrowPaint);
-            }
-
-            canvas.DrawText("X", offset + size + 2, offset, _textFont, _textPaint);
-
-            canvas.Save();
-            canvas.Scale(1, -1);
-            canvas.DrawText("Y", offset, -(offset + size + 12), _textFont, _textPaint);
-            canvas.Restore();
-        }
-        finally
-        {
-            canvas.Restore();
-        }
+        canvas.Scale(1, -1);
+        canvas.DrawText("X", halfW - 16, 12, _textFont, _textPaint);
+        canvas.DrawText("Y", 6, -(halfH - 10), _textFont, _textPaint);
+        canvas.Restore();
     }
 }

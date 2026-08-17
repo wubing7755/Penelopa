@@ -6,14 +6,25 @@ namespace Penelopa.Rendering.Tests;
 public class ViewTransformTests
 {
     [Fact]
-    public void WorldToView_AppliesYFlipAndDprScale()
+    public void WorldToView_OriginIsCanvasCenter()
+    {
+        var transform = new ViewTransform(100, 200, 2f);
+
+        var view = transform.WorldToView(0f, 0f);
+
+        Assert.Equal(50f, view.X);
+        Assert.Equal(100f, view.Y);
+    }
+
+    [Fact]
+    public void WorldToView_AppliesCenterOffsetYFlipAndDprScale()
     {
         var transform = new ViewTransform(100, 200, 2f);
 
         var view = transform.WorldToView(10f, 30f);
 
-        Assert.Equal(20f, view.X);          // 10 * dpr
-        Assert.Equal(140f, view.Y);         // height - 30 * dpr
+        Assert.Equal(70f, view.X);   // width/2 + 10 * dpr
+        Assert.Equal(40f, view.Y);   // height/2 - 30 * dpr
     }
 
     [Fact]
@@ -52,14 +63,14 @@ public class ViewTransformTests
     }
 
     [Fact]
-    public void WorldToView_WithUnitRatio_IsPureYFlip()
+    public void WorldToView_WithUnitRatio_IsCenterPlusYFlip()
     {
         var transform = new ViewTransform(100, 200, 1f);
 
         var view = transform.WorldToView(10f, 30f);
 
-        Assert.Equal(10f, view.X);
-        Assert.Equal(170f, view.Y);
+        Assert.Equal(60f, view.X);   // width/2 + 10
+        Assert.Equal(70f, view.Y);   // height/2 - 30
     }
 
     [Fact]
@@ -68,5 +79,40 @@ public class ViewTransformTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ViewTransform(0, 10, 1f));
         Assert.Throws<ArgumentOutOfRangeException>(() => new ViewTransform(10, 0, 1f));
         Assert.Throws<ArgumentOutOfRangeException>(() => new ViewTransform(10, 10, 0f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ViewTransform(10, 10, 1f, 0f));
+    }
+
+    [Fact]
+    public void WorldToView_WithZoom_ScalesWorldAroundCenter()
+    {
+        var transform = new ViewTransform(100, 200, 1f, zoom: 2f);
+
+        var view = transform.WorldToView(10f, 10f);
+
+        Assert.Equal(70f, view.X);   // width/2 + 10 * zoom
+        Assert.Equal(80f, view.Y);   // height/2 - 10 * zoom
+    }
+
+    [Fact]
+    public void WorldToView_WithPan_OffsetsOrigin()
+    {
+        var transform = new ViewTransform(100, 200, 1f, zoom: 1f, panX: 15f, panY: -5f);
+
+        var view = transform.WorldToView(0f, 0f);
+
+        Assert.Equal(65f, view.X);   // width/2 + panX
+        Assert.Equal(95f, view.Y);   // height/2 + panY
+    }
+
+    [Fact]
+    public void ZoomedView_RoundTripsWorldToView()
+    {
+        var transform = new ViewTransform(100, 200, 2f, zoom: 1.5f, panX: 10f, panY: -8f);
+
+        var view = transform.WorldToView(10f, 30f);
+        var world = transform.ViewToWorld(view.X, view.Y);
+
+        Assert.Equal(10f, world.X, 3);
+        Assert.Equal(30f, world.Y, 3);
     }
 }

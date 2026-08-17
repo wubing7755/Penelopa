@@ -10,6 +10,13 @@ public interface IPrimitiveService
     void Add(Primitive primitive);
     void Remove(Primitive primitive);
     IEnumerable<Primitive> GetAll();
+    void AddToContainer(Container container, Primitive child);
+    void ReplaceAll(IReadOnlyList<Primitive> primitives, bool clearHistory = true);
+    void Undo();
+    void Redo();
+    bool CanUndo { get; }
+    bool CanRedo { get; }
+    void CaptureForGesture();
     void SetSelected(Primitive primitive);
     void SetSelectedRange(IEnumerable<Primitive> primitives);
     void AppendSelected(Primitive primitive);
