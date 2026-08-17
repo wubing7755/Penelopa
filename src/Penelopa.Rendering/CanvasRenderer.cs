@@ -4,10 +4,13 @@ using SkiaSharp;
 namespace Penelopa.Rendering;
 
 /// <summary>
-/// Renders primitives onto a fixed-size canvas and performs color-key hit
-/// testing. The visible canvas and the off-screen hit buffer share the same
-/// y-flip transform (origin at bottom-left, y grows up), so a screen pixel
-/// from the mouse maps directly into the hit buffer.
+/// Renders primitives onto a render-target-sized bitmap and performs color-key
+/// hit testing. The visible canvas and the off-screen hit buffer share one
+/// <see cref="ViewTransform"/> (origin at bottom-left, Y grows up, scaled by
+/// the device pixel ratio), so a CSS screen pixel from the mouse maps into the
+/// hit buffer through the same transform that positioned the visible content.
+/// The render target size is supplied by the host from the SKGLView event
+/// (<c>e.Info</c>), never inferred from the canvas device bounds.
 /// </summary>
 public sealed class CanvasRenderer
 {
@@ -15,8 +18,7 @@ public sealed class CanvasRenderer
 
     private SKBitmap _drawBitmap = new(new SKImageInfo(FallbackCanvasSize, FallbackCanvasSize));
     private SKBitmap _hitBitmap = new(new SKImageInfo(FallbackCanvasSize, FallbackCanvasSize));
-    private int _width = FallbackCanvasSize;
-    private int _height = FallbackCanvasSize;
+    private ViewTransform _viewTransform = new(FallbackCanvasSize, FallbackCanvasSize, 1f);
 
     private readonly SKPaint _axisPaint = new()
     {
@@ -48,46 +50,81 @@ public sealed class CanvasRenderer
     /// <summary>
     /// Renders the primitives to the canvas and refreshes the hit buffer.
     /// </summary>
-    public void Render(SKCanvas canvas, IReadOnlyList<Primitive> primitives)
+    /// <param name="canvas">The target canvas from the SKGLView paint event.</param>
+    /// <param name="info">The user-visible render target size
+    /// (<c>SKPaintGLSurfaceEventArgs.Info</c>, in physical pixels when
+    /// <c>IgnorePixelScaling</c> is false). Do not pass the raw info of a
+    /// scaled surface, or the coordinate spaces diverge.</param>
+    /// <param name="devicePixelRatio">The CSS-to-physical pixel ratio
+    /// (<c>window.devicePixelRatio</c>).</param>
+    /// <param name="primitives">The primitives to draw.</param>
+    public void Render(
+        SKCanvas canvas,
+        SKImageInfo info,
+        float devicePixelRatio,
+        IReadOnlyList<Primitive> primitives)
     {
-        EnsureBuffersFor(canvas);
+        EnsureBuffersFor(info.Width, info.Height, devicePixelRatio);
         canvas.Clear(SKColors.Black);
         DrawPrimitives(primitives);
         canvas.DrawBitmap(_drawBitmap, 0, 0);
         DrawCoordinateSystem(canvas);
     }
 
-    private void EnsureBuffersFor(SKCanvas canvas)
+    /// <summary>
+    /// Updates the device pixel ratio used by subsequent hit tests, keeping
+    /// pointer coordinates in sync with the most recent display scale without
+    /// waiting for the next render frame.
+    /// </summary>
+    public void SetDevicePixelRatio(float devicePixelRatio)
     {
-        var bounds = canvas.DeviceClipBounds;
-        var width = bounds.Width > 0 ? bounds.Width : FallbackCanvasSize;
-        var height = bounds.Height > 0 ? bounds.Height : FallbackCanvasSize;
-        if (_drawBitmap.Width == width && _drawBitmap.Height == height)
+        if (_viewTransform.DevicePixelRatio == devicePixelRatio)
         {
             return;
         }
 
-        _drawBitmap.Dispose();
-        _hitBitmap.Dispose();
-        _drawBitmap = new SKBitmap(new SKImageInfo(width, height));
-        _hitBitmap = new SKBitmap(new SKImageInfo(width, height));
-        _width = width;
-        _height = height;
+        _viewTransform = new ViewTransform(
+            _viewTransform.ViewWidth,
+            _viewTransform.ViewHeight,
+            devicePixelRatio);
+    }
+
+    private void EnsureBuffersFor(int width, int height, float devicePixelRatio)
+    {
+        var safeWidth = width > 0 ? width : FallbackCanvasSize;
+        var safeHeight = height > 0 ? height : FallbackCanvasSize;
+        if (_drawBitmap.Width != safeWidth || _drawBitmap.Height != safeHeight)
+        {
+            _drawBitmap.Dispose();
+            _hitBitmap.Dispose();
+            _drawBitmap = new SKBitmap(new SKImageInfo(safeWidth, safeHeight));
+            _hitBitmap = new SKBitmap(new SKImageInfo(safeWidth, safeHeight));
+        }
+
+        if (_viewTransform.ViewWidth != safeWidth
+            || _viewTransform.ViewHeight != safeHeight
+            || _viewTransform.DevicePixelRatio != devicePixelRatio)
+        {
+            _viewTransform = new ViewTransform(safeWidth, safeHeight, devicePixelRatio);
+        }
     }
 
     /// <summary>
-    /// Returns the primitive under a screen pixel, or null when the pixel is
-    /// empty. The screen coordinates are the same ones reported by a mouse
-    /// event over the canvas (origin at top-left, y grows down).
+    /// Returns the primitive under a CSS screen pixel, or null when the pixel
+    /// is empty. The coordinates are the browser event coordinates over the
+    /// canvas (origin at top-left, Y grows down).
     /// </summary>
-    public Primitive? HitTest(int screenX, int screenY)
+    public Primitive? HitTest(float screenCssX, float screenCssY)
     {
-        if ((uint)screenX >= (uint)_hitBitmap.Width || (uint)screenY >= (uint)_hitBitmap.Height)
+        var view = _viewTransform.ScreenToView(screenCssX, screenCssY);
+        var x = (int)view.X;
+        var y = (int)view.Y;
+        if ((uint)x >= (uint)_hitBitmap.Width || (uint)y >= (uint)_hitBitmap.Height)
         {
             return null;
         }
 
-        var color = _hitBitmap.GetPixel(screenX, screenY);
+        var color = _hitBitmap.GetPixel(x, y);
         var colorKey = (uint)color;
         return ColorKeyManager.TryGetPrimitive(colorKey, out var primitive) ? primitive : null;
     }
@@ -104,11 +141,8 @@ public sealed class CanvasRenderer
         hitCanvas.Save();
         try
         {
-            // Flip to world coordinates: origin at bottom-left, y grows up.
-            canvas.Translate(0, _height);
-            canvas.Scale(1, -1);
-            hitCanvas.Translate(0, _height);
-            hitCanvas.Scale(1, -1);
+            _viewTransform.ApplyTo(canvas);
+            _viewTransform.ApplyTo(hitCanvas);
 
             foreach (var primitive in primitives)
             {
@@ -230,45 +264,41 @@ public sealed class CanvasRenderer
     /// </summary>
     private void DrawCoordinateSystem(SKCanvas canvas)
     {
-        const int size = 30;
-        const int offset = 10;
+        const float size = 30f;
+        const float offset = 10f;
 
         canvas.Save();
         try
         {
-            canvas.Translate(0, _height);
-            canvas.Scale(1, -1);
+            _viewTransform.ApplyTo(canvas);
 
-            float originX = offset;
-            float originY = offset;
+            canvas.DrawLine(offset, offset, offset + size, offset, _axisPaint);
+            canvas.DrawLine(offset, offset, offset, offset + size, _axisPaint);
 
-            canvas.DrawLine(originX, originY, originX + size, originY, _axisPaint);
-            canvas.DrawLine(originX, originY, originX, originY + size, _axisPaint);
-
-            float arrowSize = 4;
+            const float arrowSize = 4f;
             using (var path = new SKPath())
             {
-                path.MoveTo(originX + size, originY);
-                path.LineTo(originX + size - arrowSize, originY - arrowSize);
-                path.LineTo(originX + size - arrowSize, originY + arrowSize);
+                path.MoveTo(offset + size, offset);
+                path.LineTo(offset + size - arrowSize, offset - arrowSize);
+                path.LineTo(offset + size - arrowSize, offset + arrowSize);
                 path.Close();
                 canvas.DrawPath(path, _arrowPaint);
             }
 
             using (var path = new SKPath())
             {
-                path.MoveTo(originX, originY + size);
-                path.LineTo(originX - arrowSize, originY + size - arrowSize);
-                path.LineTo(originX + arrowSize, originY + size - arrowSize);
+                path.MoveTo(offset, offset + size);
+                path.LineTo(offset - arrowSize, offset + size - arrowSize);
+                path.LineTo(offset + arrowSize, offset + size - arrowSize);
                 path.Close();
                 canvas.DrawPath(path, _arrowPaint);
             }
 
-            canvas.DrawText("X", originX + size + 2, originY, _textFont, _textPaint);
+            canvas.DrawText("X", offset + size + 2, offset, _textFont, _textPaint);
 
             canvas.Save();
             canvas.Scale(1, -1);
-            canvas.DrawText("Y", originX, -(originY + size + 12), _textFont, _textPaint);
+            canvas.DrawText("Y", offset, -(offset + size + 12), _textFont, _textPaint);
             canvas.Restore();
         }
         finally

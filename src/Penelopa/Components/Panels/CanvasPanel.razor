@@ -1,5 +1,6 @@
 @namespace Penelopa.Components
 @using Atlas.Blazor.Content
+@using Microsoft.JSInterop
 @using Penelopa.Core.Primitives
 @using Penelopa.Core.Services
 @using Penelopa.Rendering
@@ -10,7 +11,6 @@
 
 <div class="penelopa-canvas">
     <SKGLView EnableRenderLoop="true"
-              IgnorePixelScaling="true"
               OnPaintSurface="OnPaintSurface"
               @onmousedown="HandleMouseDown"
               style="width: 100%; height: 100%;" />
@@ -19,14 +19,42 @@
 @code {
     private readonly CanvasRenderer _renderer = new();
     private readonly List<Primitive> _primitives = new();
+    private double _dpr = 1;
+    private DotNetObjectReference<CanvasPanel>? _dprRef;
 
     [Inject]
     private IPrimitiveService PrimitiveService { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
         PrimitiveService.OnChange += AddPrimitive;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // The canvas renders at physical resolution (IgnorePixelScaling
+        // defaults to false): one CSS pixel maps to devicePixelRatio physical
+        // pixels. Keep the ratio in sync, including moves across displays
+        // with different DPI.
+        _dpr = await JS.InvokeAsync<double>("penelopa.getDpr");
+        _dprRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("penelopa.watchDpr", _dprRef);
+    }
+
+    [JSInvokable]
+    public void OnDevicePixelRatioChanged(double dpr)
+    {
+        _dpr = dpr;
+        StateHasChanged();
     }
 
     private void AddPrimitive(Primitive primitive)
@@ -37,12 +65,15 @@
 
     private void OnPaintSurface(SKPaintGLSurfaceEventArgs e)
     {
-        _renderer.Render(e.Surface.Canvas, _primitives);
+        _renderer.Render(e.Surface.Canvas, e.Info, (float)_dpr, _primitives);
     }
 
     private void HandleMouseDown(MouseEventArgs e)
     {
-        var hit = _renderer.HitTest((int)e.OffsetX, (int)e.OffsetY);
+        // Sync the renderer's ratio before the hit test so pointer
+        // coordinates map to the latest display scale.
+        _renderer.SetDevicePixelRatio((float)_dpr);
+        var hit = _renderer.HitTest((float)e.OffsetX, (float)e.OffsetY);
         if (hit is null)
         {
             PrimitiveService.ClearSelection();
@@ -62,5 +93,6 @@
     public void Dispose()
     {
         PrimitiveService.OnChange -= AddPrimitive;
+        _dprRef?.Dispose();
     }
 }
