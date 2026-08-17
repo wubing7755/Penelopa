@@ -1,64 +1,38 @@
 @namespace Penelopa.Components
+@implements IAsyncDisposable
 
 @* Penelopa workspace: Atlas dockable layout hosting the four editor panes.
-   Mirrors Atlas.Demo's six-region layout: inline-start dock (tools +
-   lower slot), document area, inline-end dock (properties + lower slot),
-   and a block-end dock with the two bottom slots, plus a top toolbar and
-   status bar supplied through the host slots. *@
+   The layout tree is built programmatically (PenelopaWorkspaceDefinition) so
+   this markup stays focused on content routing; the top toolbar and status
+   bar are supplied through the host slots. *@
 
 <section class="penelopa-shell" aria-label="Penelopa primitive alignment editor">
-    <AtlasWorkspaceHost WorkspaceId="@workspaceId" EnableInteractions="true">
+    <AtlasWorkspaceHost Workspace="@_workspace"
+                        WorkspaceOwnership="WorkspaceOwnership.External"
+                        EnableInteractions="true">
         <TopToolbarContent>
             <PenelopaTopToolbar />
         </TopToolbarContent>
         <StatusBarContent>
             <PenelopaStatusBar />
         </StatusBarContent>
-        <ChildContent>
-            <AtlasSplitDefinition Id="@(new LayoutNodeId("root"))" Axis="SplitAxis.BlockChildren" Basis="SplitBasis.Proportional(0.78)">
-                <AtlasSplitDefinition Id="@(new LayoutNodeId("main-area"))" Axis="SplitAxis.InlineChildren" Basis="SplitBasis.FixedPixels(300d, SplitAnchor.First)">
-                    <AtlasSplitDefinition Id="@(new LayoutNodeId("left-dock"))" Axis="SplitAxis.BlockChildren">
-                        <AtlasToolGroupDefinition Id="@(new LayoutNodeId("tools-group"))" LogicalRegion="LogicalRegion.InlineStartUpper">
-                            <AtlasToolItemDefinition Id="@(new DockItemId("tools"))" ContentKind="penelopa-tools" ResourceId="tools" Title="Tools" />
-                            <AtlasToolItemDefinition Id="@(new DockItemId("tree"))" ContentKind="penelopa-tree" ResourceId="tree" Title="Primitives" />
-                        </AtlasToolGroupDefinition>
-                        <AtlasToolGroupDefinition Id="@(new LayoutNodeId("left-lower"))" LogicalRegion="LogicalRegion.InlineStartLower" Visibility="GroupVisibility.Collapsed" />
-                    </AtlasSplitDefinition>
-                    <AtlasSplitDefinition Id="@(new LayoutNodeId("editor-right"))" Axis="SplitAxis.InlineChildren" Basis="SplitBasis.FixedPixels(300d, SplitAnchor.Second)">
-                        <AtlasDocumentGroupDefinition Id="@(new LayoutNodeId("docs-group"))">
-                            <AtlasDocumentItemDefinition Id="@(new DockItemId("canvas"))" ContentKind="penelopa-canvas" ResourceId="canvas" Title="Diagram" />
-                        </AtlasDocumentGroupDefinition>
-                        <AtlasSplitDefinition Id="@(new LayoutNodeId("right-dock"))" Axis="SplitAxis.BlockChildren">
-                            <AtlasToolGroupDefinition Id="@(new LayoutNodeId("props-group"))" LogicalRegion="LogicalRegion.InlineEndUpper">
-                                <AtlasToolItemDefinition Id="@(new DockItemId("props"))" ContentKind="penelopa-props" ResourceId="props" Title="Properties" />
-                            </AtlasToolGroupDefinition>
-                            <AtlasToolGroupDefinition Id="@(new LayoutNodeId("right-lower"))" LogicalRegion="LogicalRegion.InlineEndLower" Visibility="GroupVisibility.Collapsed" />
-                        </AtlasSplitDefinition>
-                    </AtlasSplitDefinition>
-                </AtlasSplitDefinition>
-                <AtlasSplitDefinition Id="@(new LayoutNodeId("bottom-dock"))" Axis="SplitAxis.InlineChildren">
-                    <AtlasToolGroupDefinition Id="@(new LayoutNodeId("bottom-left"))" LogicalRegion="LogicalRegion.BlockEndInlineStart" Visibility="GroupVisibility.Collapsed" />
-                    <AtlasToolGroupDefinition Id="@(new LayoutNodeId("bottom-right"))" LogicalRegion="LogicalRegion.BlockEndInlineEnd" Visibility="GroupVisibility.Collapsed" />
-                </AtlasSplitDefinition>
-            </AtlasSplitDefinition>
-        </ChildContent>
         <ContentRoutes>
-            <AtlasContentRoute Kind="penelopa-tools">
+            <AtlasContentRoute Kind="@PenelopaContentKinds.Tools">
                 <ChildContent Context="content">
                     <ToolPanel Content="content" />
                 </ChildContent>
             </AtlasContentRoute>
-            <AtlasContentRoute Kind="penelopa-tree">
+            <AtlasContentRoute Kind="@PenelopaContentKinds.Tree">
                 <ChildContent Context="content">
                     <PrimitiveTreePanel Content="content" />
                 </ChildContent>
             </AtlasContentRoute>
-            <AtlasContentRoute Kind="penelopa-canvas">
+            <AtlasContentRoute Kind="@PenelopaContentKinds.Canvas">
                 <ChildContent Context="content">
                     <CanvasPanel Content="content" />
                 </ChildContent>
             </AtlasContentRoute>
-            <AtlasContentRoute Kind="penelopa-props">
+            <AtlasContentRoute Kind="@PenelopaContentKinds.Props">
                 <ChildContent Context="content">
                     <PropertyPanel Content="content" />
                 </ChildContent>
@@ -68,5 +42,33 @@
 </section>
 
 @code {
-    private readonly WorkspaceId workspaceId = new("penelopa");
+    private IAtlasWorkspace? _workspace;
+
+    [Inject]
+    private IAtlasWorkspaceFactory Factory { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        var result = Factory.Create(PenelopaWorkspaceDefinition.Create("penelopa"));
+        if (!result.Succeeded || result.Value is null)
+        {
+            throw new InvalidOperationException(
+                result.Error?.DiagnosticId ?? "Penelopa workspace initialization failed.");
+        }
+
+        _workspace = result.Value;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_workspace is null)
+        {
+            return;
+        }
+
+        await _workspace.DisposeAsync();
+        _workspace = null;
+    }
 }

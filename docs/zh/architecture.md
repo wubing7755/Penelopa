@@ -35,7 +35,21 @@ src/Penelopa.Core                          图元模型 + 对齐算法
 
 ### Penelopa（WASM 应用）
 
-- `PenelopaWorkspace.razor` 将 Atlas 布局声明为六区域工作区：inline-start 停靠区（Tools + Primitives，下方空槽位）、中央文档组（Diagram）、inline-end 停靠区（Properties，下方空槽位）、以及含两个空槽位的 block-end 停靠区。左右停靠区初始各 300px，侧面板对称；四个空组保持折叠，仅保留工具栏槽位。`PenelopaTopToolbar` 与 `PenelopaStatusBar` 通过 `TopToolbarContent` / `StatusBarContent` 宿主插槽提供。
+- `PenelopaWorkspace.razor` 通过程序式 API 承载工作区：构建
+  `AtlasWorkspaceDefinition`（`PenelopaWorkspaceDefinition`），把结果
+  `IAtlasWorkspace` 传给 `AtlasWorkspaceHost`，并指定
+  `WorkspaceOwnership.External`（组件负责释放）。布局为六区域工作区：
+  inline-start 停靠区（Tools + Primitives，下方空槽位）、中央文档组
+  （Diagram）、inline-end 停靠区（Properties，下方空槽位）、以及含两个
+  空槽位的 block-end 停靠区。左右停靠区初始各 300px，侧面板对称；四个
+  空组保持折叠，仅保留工具栏槽位。`PenelopaTopToolbar` 与
+  `PenelopaStatusBar` 通过 `TopToolbarContent` / `StatusBarContent` 宿主
+  插槽提供，四个面板通过 `ContentRoutes` 注册，使用
+  `PenelopaContentKinds` 中的种类常量。
+- `PenelopaWorkspaceDefinition.cs` 以程序式方式构建布局树
+  （`SplitNode` / `GroupNode` / `DockItem` 数组与工具栏状态），复刻声明式
+  缺省值：内部停靠区与底部停靠区使用 0.5 比例基准，文档组使用 Scroll
+  溢出与 Adjacent 激活，空折叠组为 Persistent 且无选中项。
 - `CanvasPanel.razor` 承载 `SKGLView`（`EnableRenderLoop=true`、`IgnorePixelScaling=true`，填满面板），接线 `OnPaintSurface` → `CanvasRenderer.Render`，以及 `mousedown` → `HitTest` → 选择（Ctrl 点击追加）。
 - `ToolPanel.razor` 提供 Add（Circle/Rectangle/Triangle）与 Align（六方向）操作。
 - `PrimitiveTreePanel.razor` 列出全部图元，点击选择。
