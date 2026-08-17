@@ -56,14 +56,26 @@ a browser:
 
 ### Penelopa (WASM app)
 
-- `PenelopaWorkspace.razor` declares the Atlas layout as a six-region
-  workspace: an inline-start dock (Tools + Primitives over an empty lower
-  slot), a central document group (Diagram), an inline-end dock (Properties
-  over an empty lower slot), and a block-end dock with two empty slots. The
-  left and right docks start at 300px each so the side panels are symmetric;
-  the four empty groups stay collapsed and only keep their toolbar slots.
+- `PenelopaWorkspace.razor` hosts the workspace through the programmatic
+  API: it builds the `AtlasWorkspaceDefinition` (via
+  `PenelopaWorkspaceDefinition`) and passes the resulting `IAtlasWorkspace`
+  to `AtlasWorkspaceHost` with `WorkspaceOwnership.External`, so the
+  component owns disposal. The layout is a six-region workspace: an
+  inline-start dock (Tools + Primitives over an empty lower slot), a central
+  document group (Diagram), an inline-end dock (Properties over an empty
+  lower slot), and a block-end dock with two empty slots. The left and right
+  docks start at 300px each so the side panels are symmetric; the four empty
+  groups stay collapsed and only keep their toolbar slots.
   `PenelopaTopToolbar` and `PenelopaStatusBar` are supplied through the
-  `TopToolbarContent` / `StatusBarContent` host slots.
+  `TopToolbarContent` / `StatusBarContent` host slots, and the four panels
+  are registered through `ContentRoutes` using the kind constants in
+  `PenelopaContentKinds`.
+- `PenelopaWorkspaceDefinition.cs` builds the layout tree programmatically
+  (`SplitNode` / `GroupNode` / `DockItem` arrays plus toolbar states),
+  mirroring the declarative defaults: the inner dock splits and the bottom
+  dock use a 0.5 proportional basis, the document group uses Scroll overflow
+  with Adjacent activation, and the empty collapsed groups are persistent
+  with no selected item.
 - `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
   `IgnorePixelScaling=true`, fills the panel) and wires `OnPaintSurface` →
   `CanvasRenderer.Render`, plus `mousedown` → `HitTest` → selection
