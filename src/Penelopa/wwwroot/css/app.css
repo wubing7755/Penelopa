@@ -62,6 +62,8 @@ h1:focus {
     --penelopa-border: #d0d7de;
     --penelopa-hover: #e2e8f0;
     --penelopa-selection: #d6e4ff;
+    --penelopa-scrollbar-thumb: #c5cbd4;
+    --penelopa-scrollbar-thumb-hover: #a8b0bc;
     background: var(--penelopa-bg);
     color: var(--penelopa-ink);
 }
@@ -80,6 +82,8 @@ h1:focus {
         --penelopa-border: #383a3f;
         --penelopa-hover: #2f3136;
         --penelopa-selection: #2b3a52;
+        --penelopa-scrollbar-thumb: #464a52;
+        --penelopa-scrollbar-thumb-hover: #5a5f69;
         background: var(--penelopa-bg);
         color: var(--penelopa-ink);
     }
@@ -436,8 +440,22 @@ h1:focus {
     outline-offset: 1px;
 }
 
-.penelopa-canvas {
+.penelopa-canvas-scroll {
+    width: 100%;
     height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+/* The canvas keeps a minimum content size so shrinking the window shows
+   scrollbars instead of clipping the drawing area. The SKGLView inside
+   fills this content box; browser pointer events report OffsetX/Y relative
+   to that element, so hit testing is unaffected by scroll position. */
+.penelopa-canvas {
+    width: max(100%, var(--penelopa-canvas-min-width, 1600px));
+    height: max(100%, var(--penelopa-canvas-min-height, 1200px));
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
@@ -453,6 +471,59 @@ h1:focus {
     border: 1px solid var(--penelopa-border);
     border-radius: var(--atlas-radius, 0.375rem);
     box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--penelopa-ink) 14%, transparent);
+}
+
+/* ---- 6.5 Scrollbars ---- */
+
+/* Thin, quiet scrollbars for the editor panels; colors follow the theme. */
+.penelopa-canvas-scroll,
+.penelopa-tools,
+.penelopa-tree,
+.penelopa-properties {
+    scrollbar-width: thin;
+    scrollbar-color: var(--penelopa-scrollbar-thumb) transparent;
+}
+
+.penelopa-canvas-scroll::-webkit-scrollbar,
+.penelopa-tools::-webkit-scrollbar,
+.penelopa-tree::-webkit-scrollbar,
+.penelopa-properties::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.penelopa-canvas-scroll::-webkit-scrollbar-track,
+.penelopa-tools::-webkit-scrollbar-track,
+.penelopa-tree::-webkit-scrollbar-track,
+.penelopa-properties::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.penelopa-canvas-scroll::-webkit-scrollbar-thumb,
+.penelopa-tools::-webkit-scrollbar-thumb,
+.penelopa-tree::-webkit-scrollbar-thumb,
+.penelopa-properties::-webkit-scrollbar-thumb {
+    background: var(--penelopa-scrollbar-thumb);
+    border: 2px solid transparent;
+    border-radius: 5px;
+    background-clip: padding-box;
+}
+
+.penelopa-canvas-scroll::-webkit-scrollbar-thumb:hover,
+.penelopa-tools::-webkit-scrollbar-thumb:hover,
+.penelopa-tree::-webkit-scrollbar-thumb:hover,
+.penelopa-properties::-webkit-scrollbar-thumb:hover {
+    background: var(--penelopa-scrollbar-thumb-hover);
+    border: 2px solid transparent;
+    border-radius: 5px;
+    background-clip: padding-box;
+}
+
+.penelopa-canvas-scroll::-webkit-scrollbar-corner,
+.penelopa-tools::-webkit-scrollbar-corner,
+.penelopa-tree::-webkit-scrollbar-corner,
+.penelopa-properties::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 /* ---- 7. Bootstrap leftovers (default template rules) ---- */

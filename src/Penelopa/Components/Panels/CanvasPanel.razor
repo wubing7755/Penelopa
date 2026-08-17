@@ -9,11 +9,13 @@
 @inherits AtlasContentComponent
 @implements IDisposable
 
-<div class="penelopa-canvas">
-    <SKGLView EnableRenderLoop="true"
-              OnPaintSurface="OnPaintSurface"
-              @onmousedown="HandleMouseDown"
-              style="width: 100%; height: 100%;" />
+<div class="penelopa-canvas-scroll">
+    <div class="penelopa-canvas">
+        <SKGLView EnableRenderLoop="true"
+                  OnPaintSurface="OnPaintSurface"
+                  @onmousedown="HandleMouseDown"
+                  style="width: 100%; height: 100%;" />
+    </div>
 </div>
 
 @code {
@@ -70,8 +72,9 @@
 
     private void HandleMouseDown(MouseEventArgs e)
     {
-        // Sync the renderer's ratio before the hit test so pointer
-        // coordinates map to the latest display scale.
+        // Browser OffsetX/Y are relative to the SKGLView canvas element (the
+        // scroll container's content), not the viewport: scrolling the canvas
+        // does not change them, so hit testing needs no scroll-offset math.
         _renderer.SetDevicePixelRatio((float)_dpr);
         var hit = _renderer.HitTest((float)e.OffsetX, (float)e.OffsetY);
         if (hit is null)
