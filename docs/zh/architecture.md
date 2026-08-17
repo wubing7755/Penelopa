@@ -59,11 +59,13 @@ src/Penelopa.Core                          图元模型 + 对齐算法
   缺省值：内部停靠区与底部停靠区使用 0.5 比例基准，文档组使用 Scroll
   溢出与 Adjacent 激活，空折叠组为 Persistent 且无选中项。
 - `CanvasPanel.razor` 承载 `SKGLView`（`EnableRenderLoop=true`，默认
-  `IgnorePixelScaling=false` 物理分辨率渲染，填满面板），接线
-  `OnPaintSurface` → `CanvasRenderer.Render`（传事件的 `e.Info` 尺寸与当前
-  `devicePixelRatio`），以及 `mousedown` → `HitTest` → 选择（Ctrl 点击追加）。
-  `wwwroot/js/penelopa.js` 用 matchMedia 监听 `devicePixelRatio` 变化，跨
-  DPI 显示器拖动时保持同步。
+  `IgnorePixelScaling=false` 物理分辨率渲染），位于可滚动内容盒
+  （`.penelopa-canvas-scroll` + 最小内容尺寸）内，缩小窗口时显示滚动条
+  而非裁剪绘制区。接线 `OnPaintSurface` → `CanvasRenderer.Render`（传事件的
+  `e.Info` 尺寸与当前 `devicePixelRatio`），以及 `mousedown` → `HitTest` →
+  选择（Ctrl 点击追加）。浏览器 `OffsetX/Y` 相对画布元素，滚动不影响命中
+  检测。`wwwroot/js/penelopa.js` 用 matchMedia 监听 `devicePixelRatio`
+  变化，跨 DPI 显示器拖动时保持同步。
 - `ToolPanel.razor` 提供 Add（Circle/Rectangle/Triangle）与 Align（六方向）操作。
 - `PrimitiveTreePanel.razor` 列出全部图元，点击选择。
 - `PropertyPanel.razor` 通过 `Panels/Props/` 中的类型化输入组件渲染选中图元的 `PropValue` 属性包。

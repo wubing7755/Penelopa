@@ -79,12 +79,16 @@ a browser:
   with Adjacent activation, and the empty collapsed groups are persistent
   with no selected item.
 - `CanvasPanel.razor` hosts the `SKGLView` (`EnableRenderLoop=true`,
-  physical-resolution rendering via the default `IgnorePixelScaling=false`,
-  fills the panel) and wires `OnPaintSurface` → `CanvasRenderer.Render` with
-  the event's `e.Info` size and the current `devicePixelRatio`, plus
-  `mousedown` → `HitTest` → selection (Ctrl-click appends). A small JS
-  helper (`wwwroot/js/penelopa.js`) watches `devicePixelRatio` changes
-  (matchMedia) so moves across displays with different DPI stay in sync.
+  physical-resolution rendering via the default `IgnorePixelScaling=false`)
+  inside a scrollable content box (`.penelopa-canvas-scroll` with a minimum
+  content size), so shrinking the window shows scrollbars instead of
+  clipping the drawing area. It wires `OnPaintSurface` →
+  `CanvasRenderer.Render` with the event's `e.Info` size and the current
+  `devicePixelRatio`, plus `mousedown` → `HitTest` → selection (Ctrl-click
+  appends). Browser `OffsetX/Y` are relative to the canvas element, so
+  scrolling does not affect hit testing. A small JS helper
+  (`wwwroot/js/penelopa.js`) watches `devicePixelRatio` changes (matchMedia)
+  so moves across displays with different DPI stay in sync.
 - `ToolPanel.razor` exposes Add (Circle/Rectangle/Triangle) and Align
   (six directions) actions.
 - `PrimitiveTreePanel.razor` lists all primitives; clicking selects.
