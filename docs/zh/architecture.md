@@ -12,7 +12,7 @@ src/Penelopa（WASM 应用）
   ├── Components/PenelopaTopToolbar.razor  通过 Atlas 顶栏插槽承载
   ├── Components/PenelopaStatusBar.razor   通过 Atlas 状态栏插槽承载
   ├── Components/Panels/                   Tools / PrimitiveTree / Canvas / Properties
-  └── wwwroot/css/app.css                  编辑器外壳样式 + 高达主题
+  └── wwwroot/css/app.css                  编辑器外壳样式 + 明亮工作室主题
 src/Penelopa.Rendering                     SkiaSharp 画布 + 颜色键命中检测
 src/Penelopa.Core                          图元模型 + 对齐算法
 ```
