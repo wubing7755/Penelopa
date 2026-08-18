@@ -1,0 +1,14 @@
+{
+  "name": "penelopa",
+  "version": "0.0.0",
+  "description": "Penelopa front-end toolchain (TypeScript compilation)",
+  "scripts": {
+    "build:js": "tsc -p src/Penelopa",
+    "check:js": "tsc -p src/Penelopa --noEmit"
+  },
+  "repository": "https://github.com/wubing7755/Penelopa.git",
+  "private": "true",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

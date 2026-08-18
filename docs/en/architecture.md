@@ -94,7 +94,9 @@ a browser:
   scrollbars are no longer needed. It wires `OnPaintSurface` →
   `CanvasRenderer.Render` with the event's `e.Info` size and the current
   `devicePixelRatio`, plus `mousedown` → `HitTest` → selection (Ctrl-click
-  appends). A small JS helper (`wwwroot/js/penelopa.js`) watches
+  appends). A small helper script (`wwwroot/js/penelopa.js`, compiled from
+  `ts/penelopa.ts`; the compiled output is committed so the project runs
+  without node) watches
   `devicePixelRatio` changes (matchMedia) so moves across displays with
   different DPI stay in sync, and hosts the pointer layer (capture,
   canvas-relative CSS coordinates, synthesized-mouse suppression, rAF

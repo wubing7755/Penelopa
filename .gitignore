@@ -28,6 +28,9 @@ __pycache__/
 *.snupkg
 .packages/
 
+# Node (TypeScript toolchain; the compiled js under wwwroot is committed)
+node_modules/
+
 # Test results
 [Tt]est[Rr]esult*/
 *.trx

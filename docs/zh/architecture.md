@@ -70,7 +70,7 @@ src/Penelopa.Core                          图元模型 + 对齐算法
   视口，因此不再需要滚动条。接线 `OnPaintSurface` → `CanvasRenderer.Render`
   （传事件的 `e.Info` 尺寸与当前 `devicePixelRatio`），以及 `mousedown` →
   `HitTest` → 选择（Ctrl 点击追加）。浏览器 `OffsetX/Y` 相对画布元素，
-  视口变化不影响命中检测。`wwwroot/js/penelopa.js` 用 matchMedia 监听
+  视口变化不影响命中检测。`wwwroot/js/penelopa.js`（由 `ts/penelopa.ts` 编译，编译产物随仓库提交以便无 node 环境运行）用 matchMedia 监听
   `devicePixelRatio` 变化，跨 DPI 显示器拖动时保持同步，并承载指针层
   （捕获、画布相对 CSS 坐标、抑制合成鼠标事件、rAF 节流、滚轮缩放），
   以语义回调方式上报交互控制器。
