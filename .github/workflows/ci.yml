@@ -18,6 +18,10 @@ jobs:
         with:
           dotnet-version: '6.0.x'
       - run: dotnet workload install wasm-tools
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
       - run: dotnet restore Penelopa.sln
       - run: dotnet build Penelopa.sln --no-restore
       - run: dotnet test Penelopa.sln --no-build --no-restore
@@ -30,5 +34,9 @@ jobs:
         with:
           dotnet-version: '6.0.x'
       - run: dotnet workload install wasm-tools
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
       - run: dotnet restore Penelopa.sln
       - run: dotnet format Penelopa.sln --verify-no-changes --no-restore

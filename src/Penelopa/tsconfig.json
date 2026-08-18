@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "module": "none",
+    "outFile": "wwwroot/js/penelopa.js",
+    "rootDir": "ts",
+    "strict": true,
+    "noEmitOnError": true,
+    "removeComments": false,
+    "types": [],
+    "lib": ["ES2017", "DOM"]
+  },
+  "include": ["ts/**/*.ts"]
+}

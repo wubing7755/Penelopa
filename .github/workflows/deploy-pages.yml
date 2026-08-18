@@ -31,6 +31,14 @@ jobs:
       - name: Install wasm-tools workload
         run: dotnet workload install wasm-tools
 
+      # Regenerate the TypeScript pointer layer so the published bundle always
+      # matches ts/penelopa.ts.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build front-end scripts
+        run: npm ci && npm run build:js
+
       - name: Publish Penelopa
         run: |
           dotnet publish src/Penelopa/Penelopa.csproj \

@@ -21,6 +21,16 @@
     <ProjectReference Include="..\Penelopa.Rendering\Penelopa.Rendering.csproj" />
   </ItemGroup>
 
+  <!-- Compile the TypeScript pointer layer before every build. The committed
+       ts/penelopa.ts is the source of truth; the generated
+       wwwroot/js/penelopa.js is committed so builds without node still work
+       (CI restores it via npm ci + npm run build:js). -->
+  <Target Name="BuildTypeScript" BeforeTargets="Build">
+    <Exec Command="npm run build:js" WorkingDirectory="$(MSBuildThisFileDirectory)..\.."
+          Condition="Exists('$(MSBuildThisFileDirectory)..\..\package.json')"
+          StandardOutputImportance="normal" />
+  </Target>
+
   <!-- VS 18 (2026) does not import the .NET 6 workload SDK
        (Microsoft.NET.Runtime.WebAssembly.Sdk), so the WasmBuildNative emscripten
        link targets are missing and VS builds serve a runtime-pack dotnet.wasm
