@@ -31,9 +31,15 @@ jobs:
       - name: Install wasm-tools workload
         run: dotnet workload install wasm-tools
 
-      # penelopa.js is committed to the repository (built from ts/penelopa.ts
-      # via `npm run build:js` and reviewed through the normal PR flow), so
-      # publishing needs no Node toolchain.
+      # Penelopa.csproj's BuildTypeScript target runs `npm run build:js`
+      # before every build, so node_modules must be restored first (the lock
+      # pins tsc 5.9.3; without npm ci the runner's global tsc 6.x rejects
+      # tsconfig's module:"none"/outFile options).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Restore front-end toolchain
+        run: npm ci
 
       - name: Publish Penelopa
         run: |
