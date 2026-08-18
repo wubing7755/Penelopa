@@ -31,13 +31,9 @@ jobs:
       - name: Install wasm-tools workload
         run: dotnet workload install wasm-tools
 
-      # Regenerate the TypeScript pointer layer so the published bundle always
-      # matches ts/penelopa.ts.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Build front-end scripts
-        run: npm ci && npm run build:js
+      # penelopa.js is committed to the repository (built from ts/penelopa.ts
+      # via `npm run build:js` and reviewed through the normal PR flow), so
+      # publishing needs no Node toolchain.
 
       - name: Publish Penelopa
         run: |
@@ -49,10 +45,14 @@ jobs:
       # GitHub Pages project site maps the deployed artifact root to the
       # /Penelopa/ subpath. The dev index.html keeps base href="/" so local
       # `dotnet run` works; the deployed copy must resolve assets from
-      # /Penelopa/.
-      - name: Rewrite base href for the /Penelopa/ subpath
+      # /Penelopa/. Also append a version query to the entry scripts so a
+      # stale CDN/browser cache cannot serve an old boot loader against a new
+      # boot manifest (observed as a subresource-integrity hash mismatch).
+      - name: Rewrite base href and cache-bust for the /Penelopa/ subpath
         run: |
           sed -i 's|<base href="/" />|<base href="/Penelopa/" />|' publish/site/wwwroot/index.html
+          sed -i "s|src=\"js/penelopa.js\"|src=\"js/penelopa.js?v=${{ github.sha }}\"|" publish/site/wwwroot/index.html
+          sed -i "s|src=\"_framework/blazor.webassembly.js\"|src=\"_framework/blazor.webassembly.js?v=${{ github.sha }}\"|" publish/site/wwwroot/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
