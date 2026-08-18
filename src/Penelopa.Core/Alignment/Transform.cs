@@ -1,51 +1,33 @@
 namespace Penelopa.Core.Alignment;
 
 /// <summary>
-/// A two-dimensional affine transform matrix.
+/// 二维仿射变换矩阵（3×3，列向量约定）。
 /// </summary>
 /// <remarks>
-/// <para>
-/// 3x3 matrix, column-vector convention:
 /// <code>
-/// | a  c  tx |
-/// | b  d  ty |
+/// | a  c  tx |     x' = a*x + c*y + tx
+/// | b  d  ty |     y' = b*x + d*y + ty
 /// | 0  0  1  |
 /// </code>
-/// </para>
-/// <para>
-/// For an input point (x, y) the transformed point (x', y') is:
-/// <code>
-/// x' = a * x + c * y + tx
-/// y' = b * x + d * y + ty
-/// </code>
-/// </para>
-/// <para>
-/// Common forms:
-/// <code>
-/// Translation: Transform(1, 0, 0, 1, tx, ty)
-/// Scale:       Transform(sx, 0, 0, sy, 0, 0)
-/// Rotation:    Transform(cos, sin, -sin, cos, 0, 0)
-/// </code>
-/// </para>
 /// </remarks>
 public struct Transform
 {
-    /// <summary>Gets or sets the X scale factor.</summary>
+    /// <summary>X 缩放分量。</summary>
     public float A { get; set; }
 
-    /// <summary>Gets or sets the Y-affecting skew factor.</summary>
+    /// <summary>影响 Y 的剪切分量。</summary>
     public float B { get; set; }
 
-    /// <summary>Gets or sets the X-affecting skew factor.</summary>
+    /// <summary>影响 X 的剪切分量。</summary>
     public float C { get; set; }
 
-    /// <summary>Gets or sets the Y scale factor.</summary>
+    /// <summary>Y 缩放分量。</summary>
     public float D { get; set; }
 
-    /// <summary>Gets or sets the X translation.</summary>
+    /// <summary>X 平移分量。</summary>
     public float Tx { get; set; }
 
-    /// <summary>Gets or sets the Y translation.</summary>
+    /// <summary>Y 平移分量。</summary>
     public float Ty { get; set; }
 
     public Transform(float a, float b, float c, float d, float tx, float ty)
@@ -53,7 +35,7 @@ public struct Transform
 
     public static Transform Translate(float tx, float ty) => new(1, 0, 0, 1, tx, ty);
 
-    /// <summary>Creates a rotation transform (degrees, counter-clockwise in world space).</summary>
+    /// <summary>创建旋转变换（角度制，世界空间逆时针）。</summary>
     public static Transform Rotate(float degrees)
     {
         float radians = degrees * MathF.PI / 180f;
@@ -62,16 +44,13 @@ public struct Transform
         return new Transform(cos, sin, -sin, cos, 0, 0);
     }
 
-    /// <summary>Creates a scaling transform around the origin.</summary>
+    /// <summary>创建绕原点的缩放变换。</summary>
     public static Transform Scale(float scaleX, float scaleY) => new(scaleX, 0, 0, scaleY, 0, 0);
 
-    /// <summary>Gets the identity transform.</summary>
+    /// <summary>单位变换。</summary>
     public static Transform Identity => new(1, 0, 0, 1, 0, 0);
 
-    /// <summary>
-    /// Returns this transform composed with <paramref name="other"/>:
-    /// <c>this ∘ other</c>, which applies <paramref name="other"/> first.
-    /// </summary>
+    /// <summary>矩阵复合：<c>this ∘ other</c>，先应用 <paramref name="other"/>。</summary>
     public Transform Multiply(Transform other)
     {
         return new Transform(
@@ -83,10 +62,7 @@ public struct Transform
             B * other.Tx + D * other.Ty + Ty);
     }
 
-    /// <summary>
-    /// Returns the inverse transform. Throws when the determinant is zero
-    /// (the transform collapses the plane).
-    /// </summary>
+    /// <summary>求逆矩阵。行列式为零时抛出异常。</summary>
     public Transform Invert()
     {
         float det = A * D - B * C;
@@ -105,17 +81,14 @@ public struct Transform
             (B * Tx - A * Ty) * invDet);
     }
 
-    /// <summary>Applies the transform (including translation) to a point.</summary>
+    /// <summary>对点应用完整变换（含平移）。</summary>
     public Point ApplyToPoint(Point point)
         => new(A * point.X + C * point.Y + Tx, B * point.X + D * point.Y + Ty);
 
-    /// <summary>Applies only the linear part of the transform to a vector.</summary>
+    /// <summary>对向量仅应用线性部分（不含平移）。</summary>
     public Point ApplyToVector(float dx, float dy)
         => new(A * dx + C * dy, B * dx + D * dy);
 
-    /// <summary>
-    /// Gets whether the transform contains no rotation or skew, so world-axis
-    /// scaling maps to local-axis scaling without introducing shear.
-    /// </summary>
+    /// <summary>变换是否轴对齐（无旋转/剪切），世界轴缩放不会引入剪切。</summary>
     public bool IsAxisAligned => MathF.Abs(B) < 1e-6f && MathF.Abs(C) < 1e-6f;
 }

@@ -1,18 +1,16 @@
 namespace Penelopa.Core.Alignment;
 
 /// <summary>
-/// Contract for objects that can be aligned in world space. Alignment only
-/// translates, so the interface exposes the anchor position rather than a
-/// full affine transform.
+/// 可在世界空间中对齐的对象契约。对齐只涉及平移，因此接口暴露锚点位置而非完整仿射变换。
 /// </summary>
 public interface IAlignable
 {
-    /// <summary>Gets the world-space axis-aligned bounding box (AABB).</summary>
+    /// <summary>获取世界空间轴对齐包围盒（AABB）。</summary>
     Box GetWorldBoundingBox();
 
-    /// <summary>Gets the world-space anchor position (the AABB's top-left corner).</summary>
+    /// <summary>获取世界空间锚点位置（AABB 左上角）。</summary>
     Point GetWorldPosition();
 
-    /// <summary>Translates the item so its anchor lands at the given world position.</summary>
+    /// <summary>平移对象，使锚点到达指定的世界坐标。</summary>
     void SetWorldPosition(Point position);
 }

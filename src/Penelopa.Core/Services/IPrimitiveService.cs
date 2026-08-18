@@ -2,9 +2,7 @@ using Penelopa.Core.Primitives;
 
 namespace Penelopa.Core.Services;
 
-/// <summary>
-/// Manages the collection of primitives and the current selection.
-/// </summary>
+/// <summary>管理图元集合和当前选区。</summary>
 public interface IPrimitiveService
 {
     void Add(Primitive primitive);
@@ -23,7 +21,7 @@ public interface IPrimitiveService
     void ClearSelection();
     IEnumerable<Primitive> GetSelection();
 
-    /// <summary>Announces that the given primitives' geometry changed.</summary>
+    /// <summary>通知指定图元的几何已变更。</summary>
     void NotifyPrimitivesChanged(IEnumerable<Primitive> primitives);
 
     event Action<Primitive>? OnChange;

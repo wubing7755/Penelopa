@@ -1,8 +1,6 @@
 namespace Penelopa.Core.Alignment;
 
-/// <summary>
-/// A point in a two-dimensional coordinate system.
-/// </summary>
+/// <summary>二维坐标点。</summary>
 public readonly struct Point : IEquatable<Point>
 {
     public float X { get; }

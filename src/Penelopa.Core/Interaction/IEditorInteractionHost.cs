@@ -3,48 +3,39 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Interaction;
 
 /// <summary>
-/// The editing-side surface the interaction controller drives: selection
-/// management and geometry-change notification. Implemented by the host
-/// component so the controller stays free of Blazor/Skia dependencies and
-/// remains unit-testable.
+/// 交互控制器驱动的编辑侧接口：选择管理与几何变更通知。
+/// 由宿主组件实现，使控制器不依赖 Blazor/Skia，保持可单测。
 /// </summary>
 public interface IEditorInteractionHost
 {
-    /// <summary>Gets the current selection.</summary>
+    /// <summary>获取当前选区。</summary>
     IReadOnlyList<Primitive> GetSelection();
 
-    /// <summary>Gets whether the primitive is currently selected.</summary>
+    /// <summary>判断图元是否已选中。</summary>
     bool IsSelected(Primitive primitive);
 
-    /// <summary>Selects only the given primitive.</summary>
+    /// <summary>仅选中指定图元。</summary>
     void SetSelected(Primitive primitive);
 
-    /// <summary>Adds the primitive to the selection.</summary>
+    /// <summary>将图元加入选区。</summary>
     void AppendSelected(Primitive primitive);
 
-    /// <summary>Removes the primitive from the selection (or selects it when absent).</summary>
+    /// <summary>切换图元的选中状态。</summary>
     void ToggleSelected(Primitive primitive);
 
-    /// <summary>Clears the selection.</summary>
+    /// <summary>清空选区。</summary>
     void ClearSelection();
 
     /// <summary>
-    /// Pans the view by a CSS-pixel delta. Used by the empty-space drag
-    /// gesture; the controller reports CSS deltas because panning is a view
-    /// operation, not a world-space geometry change.
+    /// 按 CSS 像素增量平移视口。空白拖拽手势使用；控制器报告 CSS 增量是因为平移是视口操作而非世界空间几何变更。
     /// </summary>
     void PanByCss(float deltaX, float deltaY);
 
     /// <summary>
-    /// Signals that a mutating gesture (drag or resize) is about to begin, so
-    /// the host can capture undo state before the first geometry change. Fired
-    /// exactly once per gesture, at the first actual mutation.
+    /// 通知宿主即将开始修改手势（拖拽/缩放），以便在首次几何变更前捕获撤销快照。每个手势仅触发一次。
     /// </summary>
     void BeginMutation();
 
-    /// <summary>
-    /// Announces that the given primitives' geometry changed (drag/resize
-    /// commit), so panels can refresh.
-    /// </summary>
+    /// <summary>通知面板指定图元的几何已变更（拖拽/缩放提交时触发）。</summary>
     void NotifyPrimitivesChanged(IReadOnlyList<Primitive> primitives);
 }

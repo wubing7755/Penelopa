@@ -1,35 +1,16 @@
 namespace Penelopa.Core.Alignment;
 
-/// <summary>
-/// An axis-aligned bounding box.
-/// </summary>
+/// <summary>轴对齐包围盒（AABB）。</summary>
 public readonly struct Box : IEquatable<Box>
 {
-    /// <summary>Gets the minimum X coordinate.</summary>
     public float MinX { get; }
-
-    /// <summary>Gets the minimum Y coordinate.</summary>
     public float MinY { get; }
-
-    /// <summary>Gets the maximum X coordinate.</summary>
     public float MaxX { get; }
-
-    /// <summary>Gets the maximum Y coordinate.</summary>
     public float MaxY { get; }
-
-    /// <summary>Gets the box width.</summary>
     public float Width => MaxX - MinX;
-
-    /// <summary>Gets the box height.</summary>
     public float Height => MaxY - MinY;
-
-    /// <summary>Gets the X coordinate of the box center.</summary>
     public float CenterX => MinX + Width * 0.5f;
-
-    /// <summary>Gets the Y coordinate of the box center.</summary>
     public float CenterY => MinY + Height * 0.5f;
-
-    /// <summary>Gets the box center.</summary>
     public Point Center => new(CenterX, CenterY);
 
     public Box(float minX, float minY, float maxX, float maxY)
@@ -64,15 +45,8 @@ public readonly struct Box : IEquatable<Box>
         return HashCode.Combine(MinX, MinY, MaxX, MaxY);
     }
 
-    public static bool operator ==(Box left, Box right)
-    {
-        return left.Equals(right);
-    }
-
-    public static bool operator !=(Box left, Box right)
-    {
-        return !(left == right);
-    }
+    public static bool operator ==(Box left, Box right) => left.Equals(right);
+    public static bool operator !=(Box left, Box right) => !(left == right);
 
     public override string ToString()
     {

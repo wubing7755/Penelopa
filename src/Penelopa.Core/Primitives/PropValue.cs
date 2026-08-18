@@ -2,9 +2,7 @@ using System.Text.Json;
 
 namespace Penelopa.Core.Primitives;
 
-/// <summary>
-/// A named property value attached to a primitive.
-/// </summary>
+/// <summary>附加在图元上的命名属性值。</summary>
 public abstract class PropValue
 {
     public string Name { get; set; }
@@ -15,9 +13,8 @@ public abstract class PropValue
     }
 
     /// <summary>
-    /// Returns the property value boxed as <see cref="object"/>, for
-    /// serialization and history snapshots. Returns null for an unknown
-    /// <see cref="PropValue"/> subtype (which callers skip).
+    /// 将属性值装箱为 <see cref="object"/>，用于序列化和历史快照。
+    /// 未知的 <see cref="PropValue"/> 子类型返回 null（调用方跳过）。
     /// </summary>
     public object? GetBoxedValue() => this switch
     {
@@ -31,9 +28,8 @@ public abstract class PropValue
     };
 
     /// <summary>
-    /// Sets the property value from a boxed value. Values read back from JSON
-    /// are <see cref="JsonElement"/>, so both those and plain boxed values
-    /// (from history snapshots) are accepted.
+    /// 从装箱值设置属性。JSON 回读的值是 <see cref="JsonElement"/>，
+    /// 因此同时接受 JsonElement 和普通装箱值（来自历史快照）。
     /// </summary>
     public void SetBoxedValue(object value)
     {

@@ -3,26 +3,23 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Interaction;
 
 /// <summary>
-/// The layered result of a pointer hit test, computed by the renderer before
-/// the interaction controller decides what the gesture means:
-/// a corner handle (highest priority), a primitive body, or the
-/// multi-selection union box (lowest priority, used as a group-drag handle).
+/// 指针命中测试的分层结果，由渲染层在交互控制器决策前计算：
+/// 角柄（最高优先级）→ 图元本体 → 多选并集框（最低优先级，用作整组拖拽柄）。
 /// </summary>
 public readonly struct HitTestResult
 {
-    /// <summary>Gets the corner handle hit, if any.</summary>
+    /// <summary>命中的角柄（如有）。</summary>
     public ResizeHandle? Handle { get; init; }
 
-    /// <summary>Gets the primitive body hit by the color-key buffer, if any.</summary>
+    /// <summary>通过颜色键缓冲区命中的图元本体（如有）。</summary>
     public Primitive? Primitive { get; init; }
 
     /// <summary>
-    /// Gets the drill-down candidates at the point — the hit primitive and
-    /// its ancestor chain, ordered root → deepest leaf (the confirmed drill
-    /// direction). Null when nothing was hit.
+    /// 钻取候选链：命中图元及其祖先链，按根 → 最深叶子排序（即确认的钻取方向）。
+    /// 无命中时为 null。
     /// </summary>
     public IReadOnlyList<Primitive>? Candidates { get; init; }
 
-    /// <summary>Gets whether the point is inside the multi-selection union box.</summary>
+    /// <summary>点是否在多选并集框内。</summary>
     public bool InUnionBox { get; init; }
 }

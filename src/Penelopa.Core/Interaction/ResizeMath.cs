@@ -3,27 +3,22 @@ using Penelopa.Core.Alignment;
 namespace Penelopa.Core.Interaction;
 
 /// <summary>
-/// Resize math shared by the interaction layer: given the original bounds,
-/// the dragged handle, and the pointer position in world space, computes the
-/// new bounds with the opposite corner fixed. Dragging across the fixed
-/// corner flips the box (mirror), and a minimum size keeps the shape from
-/// collapsing.
+/// 缩放的数学逻辑：给定原始包围盒、拖动的角柄和世界坐标指针位置，
+/// 计算新包围盒（固定对角）。拖过固定角会翻转（镜像），最小尺寸防止形状坍塌。
 /// </summary>
 public static class ResizeMath
 {
-    /// <summary>Minimum resized width in world units.</summary>
+    /// <summary>缩放最小宽度（世界单位）。</summary>
     public const float MinWidth = 1f;
 
-    /// <summary>Minimum resized height in world units.</summary>
+    /// <summary>缩放最小高度（世界单位）。</summary>
     public const float MinHeight = 1f;
 
-    /// <summary>
-    /// Computes the new bounds for a resize gesture.
-    /// </summary>
-    /// <param name="original">The bounds captured at pointer-down.</param>
-    /// <param name="handle">The handle being dragged.</param>
-    /// <param name="pointer">The pointer position in world space.</param>
-    /// <returns>The resized bounds; the fixed corner never moves.</returns>
+    /// <summary>计算缩放后的新包围盒。</summary>
+    /// <param name="original">按下时捕获的包围盒。</param>
+    /// <param name="handle">正在拖动的角柄。</param>
+    /// <param name="pointer">指针的世界坐标位置。</param>
+    /// <returns>缩放后的包围盒；固定角始终不动。</returns>
     public static Box ComputeBounds(Box original, ResizeHandle handle, Point pointer)
     {
         var fixedCorner = FixedCorner(original, handle);
@@ -33,7 +28,7 @@ public static class ResizeMath
         float minY = MathF.Min(fixedCorner.Y, pointer.Y);
         float maxY = MathF.Max(fixedCorner.Y, pointer.Y);
 
-        // Clamp to the minimum size, anchored on the fixed corner.
+        // 限制最小尺寸，锚定在固定角
         if (maxX - minX < MinWidth)
         {
             if (pointer.X >= fixedCorner.X)
@@ -61,7 +56,7 @@ public static class ResizeMath
         return new Box(minX, minY, maxX, maxY);
     }
 
-    /// <summary>Gets the corner opposite the dragged handle, which stays fixed.</summary>
+    /// <summary>获取拖动角柄的对角（固定不动的角）。</summary>
     public static Point FixedCorner(Box bounds, ResizeHandle handle) => handle switch
     {
         ResizeHandle.TopLeft => new Point(bounds.MaxX, bounds.MinY),

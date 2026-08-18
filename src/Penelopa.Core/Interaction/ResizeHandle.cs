@@ -1,8 +1,7 @@
 namespace Penelopa.Core.Interaction;
 
 /// <summary>
-/// The four corner handles of a selection box. Resizing keeps the opposite
-/// corner fixed while the dragged corner follows the pointer.
+/// 选区框的四个角柄。缩放时固定对角，拖动角跟随指针。
 /// </summary>
 public enum ResizeHandle
 {

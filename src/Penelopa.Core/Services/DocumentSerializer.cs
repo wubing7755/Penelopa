@@ -4,9 +4,8 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Services;
 
 /// <summary>
-/// Serializes the primitive tree to and from JSON. The selection is stored as
-/// primitive ids so it can be re-resolved after load. Container children are
-/// nested inside their parent.
+/// 图元树的 JSON 序列化/反序列化。选区以图元 Id 存储，加载后可重新解析。
+/// 容器子元素嵌套在父节点内。
 /// </summary>
 public static class DocumentSerializer
 {
@@ -41,10 +40,7 @@ public static class DocumentSerializer
         return JsonSerializer.Serialize(dto, Options);
     }
 
-    /// <summary>
-    /// Deserializes a document. Returns null when the JSON is invalid. The
-    /// caller re-resolves the selection ids against the rebuilt tree.
-    /// </summary>
+    /// <summary>反序列化文档。JSON 无效时返回 null。调用方根据重建的树重新解析选区 Id。</summary>
     public static DeserializeResult? Deserialize(string json)
     {
         try
@@ -69,14 +65,12 @@ public static class DocumentSerializer
         }
         catch (JsonException)
         {
-            // Malformed JSON.
             return null;
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or OverflowException or InvalidCastException or ArgumentException)
         {
-            // Valid JSON but a malformed document (unknown type/kind, or a
-            // property of the wrong type), e.g. a hand-edited or future-version
-            // file. Treat it the same as invalid JSON.
+            // JSON 合法但文档结构异常（未知类型/种类或属性类型不匹配），
+            // 如手工编辑或未来版本文件。与无效 JSON 同等处理。
             return null;
         }
     }
@@ -164,7 +158,7 @@ public static class DocumentSerializer
     }
 }
 
-/// <summary>Result of deserializing a document.</summary>
+/// <summary>文档反序列化结果。</summary>
 public sealed class DeserializeResult
 {
     public DeserializeResult(IReadOnlyList<Primitive> roots, IReadOnlyList<Guid> selectionIds)

@@ -1,8 +1,6 @@
 namespace Penelopa.Core.Primitives;
 
-/// <summary>
-/// An ARGB color value that can be converted to and from a packed uint key.
-/// </summary>
+/// <summary>ARGB 颜色值，可与 uint 打包键互转。</summary>
 public readonly struct Color
 {
     public static readonly Color Transparent = new(0, 0, 0, 0);
@@ -22,9 +20,7 @@ public readonly struct Color
         A = a;
     }
 
-    /// <summary>
-    /// Reconstructs a color from a packed key: 0xAARRGGBB.
-    /// </summary>
+    /// <summary>从打包键重建颜色：0xAARRGGBB。</summary>
     public static Color FromUint(uint colorKey) => new(
         (byte)((colorKey >> 16) & 0xFF),
         (byte)((colorKey >> 8) & 0xFF),
@@ -32,9 +28,7 @@ public readonly struct Color
         (byte)((colorKey >> 24) & 0xFF)
     );
 
-    /// <summary>
-    /// Packs the color into a uint: 0xAARRGGBB.
-    /// </summary>
+    /// <summary>打包为 uint：0xAARRGGBB。</summary>
     public uint ToUint() => (uint)(
         (A << 24) |
         (R << 16) |

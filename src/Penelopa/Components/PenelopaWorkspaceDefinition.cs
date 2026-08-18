@@ -7,11 +7,9 @@ using Atlas.Core.Placement;
 namespace Penelopa.Components;
 
 /// <summary>
-/// Central content kind constants shared between the workspace definition and
-/// the <see cref="AtlasContentRoute"/> declarations in
-/// <see cref="PenelopaWorkspace"/>. Keeping these strings in one place prevents
-/// a rename on either side from silently producing a "Content is not
-/// registered" runtime failure.
+/// Penelopa 工作区的内容种类常量，由工作区定义和 <see cref="PenelopaWorkspace"/> 中的
+/// <see cref="AtlasContentRoute"/> 声明共享。集中管理这些字符串可防止任一侧重命名时
+/// 静默产生 "Content is not registered" 运行时错误。
 /// </summary>
 public static class PenelopaContentKinds
 {
@@ -22,11 +20,9 @@ public static class PenelopaContentKinds
 }
 
 /// <summary>
-/// Builds the Penelopa workspace: an Atlas six-region dockable layout with
-/// symmetric 300px side docks around a full-height document canvas, plus the
-/// four empty collapsed groups that keep the toolbar slots available. The
-/// layout mirrors the original declarative razor tree; both forms produce the
-/// same <see cref="AtlasWorkspaceDefinition"/>.
+/// 构建 Penelopa 工作区：Atlas 六区域可停靠布局，两侧对称 300px 侧栏围绕全高文档画布，
+/// 外加四个空折叠组保持工具栏槽位可用。布局复刻原声明式 razor 树；两种形式产出相同的
+/// <see cref="AtlasWorkspaceDefinition"/>。
 /// </summary>
 internal static class PenelopaWorkspaceDefinition
 {
@@ -71,9 +67,8 @@ internal static class PenelopaWorkspaceDefinition
             LogicalRegion.BlockEndInlineEnd,
             GroupVisibility.Collapsed);
 
-        // The left/right docks are symmetric at 300px; the inner split of each
-        // dock and the bottom dock default to a 0.5 proportional basis, exactly
-        // as the declarative form did when no Basis was specified.
+        // 左/右停靠栏对称 300px；每个停靠栏的内部分割和底部停靠栏默认为 0.5 比例基数，
+        // 与声明式形式未指定 Basis 时的行为一致
         var leftDock = Split(
             "left-dock",
             SplitAxis.BlockChildren,
@@ -135,8 +130,7 @@ internal static class PenelopaWorkspaceDefinition
             props,
         };
 
-        // The declarative collector derived these from the non-empty tool
-        // groups; the programmatic definition supplies them explicitly.
+        // 声明式收集器从非空工具组推导这些；程序式定义显式提供
         var toolBars = new[]
         {
             new ToolBarState(LogicalSide.InlineStart, ToolBarVisibility.Expanded),
@@ -167,8 +161,7 @@ internal static class PenelopaWorkspaceDefinition
         GroupVisibility visibility,
         params DockItemId[] itemIds)
     {
-        // An empty group is only valid with a persistent retention policy and
-        // no selected item (enforced by GroupNode's constructor).
+        // 空组仅在持久保留策略且无选中项时有效（由 GroupNode 构造函数强制）
         return new GroupNode(
             new LayoutNodeId(id),
             DockItemKind.Tool,
@@ -181,8 +174,7 @@ internal static class PenelopaWorkspaceDefinition
 
     private static GroupNode DocumentGroup(string id, params DockItemId[] itemIds)
     {
-        // The declarative form defaulted to Scroll overflow and Adjacent
-        // activation for the document group's editor state.
+        // 声明式形式默认为 Scroll 溢出和 Adjacent 激活的文档组编辑器状态
         return new GroupNode(
             new LayoutNodeId(id),
             DockItemKind.Document,
