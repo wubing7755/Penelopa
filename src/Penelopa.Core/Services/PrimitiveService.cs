@@ -2,9 +2,7 @@ using Penelopa.Core.Primitives;
 
 namespace Penelopa.Core.Services;
 
-/// <summary>
-/// Default <see cref="IPrimitiveService"/> implementation backed by lists.
-/// </summary>
+/// <summary><see cref="IPrimitiveService"/> 的默认实现，基于列表存储。</summary>
 public class PrimitiveService : IPrimitiveService
 {
     private readonly List<Primitive> _primitives = new();
@@ -23,10 +21,7 @@ public class PrimitiveService : IPrimitiveService
         OnChange?.Invoke(primitive);
     }
 
-    /// <summary>
-    /// Adds a child into a container. The child leaves the root list, so
-    /// rendering and the tree panel see it only inside its container.
-    /// </summary>
+    /// <summary>将子图元加入容器。子图元从根列表移除，渲染和树面板仅在容器内显示。</summary>
     public void AddToContainer(Container container, Primitive child)
     {
         _history.Capture();
@@ -60,11 +55,7 @@ public class PrimitiveService : IPrimitiveService
         return _primitives;
     }
 
-    /// <summary>
-    /// Replaces the whole document (load). Releases color keys of the old
-    /// tree, installs the new roots, and clears the selection; the caller
-    /// re-selects via ids against the new tree.
-    /// </summary>
+    /// <summary>替换整个文档（加载）。释放旧树的颜色键，安装新根列表，清空选区；调用方按 Id 重新选择。</summary>
     public void ReplaceAll(IReadOnlyList<Primitive> primitives, bool clearHistory = true)
     {
         if (clearHistory)
@@ -86,7 +77,7 @@ public class PrimitiveService : IPrimitiveService
 
     public bool CanRedo => _history.CanRedo;
 
-    /// <summary>Captures the current state before a canvas gesture starts.</summary>
+    /// <summary>画布手势开始前捕获当前状态。</summary>
     public void CaptureForGesture() => _history.Capture();
 
     public void SetSelected(Primitive primitive)

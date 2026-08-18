@@ -4,40 +4,33 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Interaction;
 
 /// <summary>
-/// Drives canvas editing gestures: click-select, drag-move, and corner-handle
-/// resize. The controller is pure model logic — it receives world- and
-/// CSS-space pointer positions and a pre-computed <see cref="HitTestResult"/>,
-/// and only mutates primitives through the world contract. World coordinates
-/// drive geometry (drag/resize); CSS coordinates drive the view pan. The host
-/// supplies both coordinate spaces and the hit test.
+/// 画布编辑手势控制器：点击选择、拖拽移动、角柄缩放。
+/// 纯模型逻辑，接收世界坐标和 CSS 坐标，通过世界契约修改图元。
 /// </summary>
 /// <remarks>
-/// Gesture invariants:
+/// 手势不变量：
 /// <list type="bullet">
-/// <item>A press only becomes a drag after the pointer moves beyond the
-/// threshold, so clicks never nudge the selection.</item>
-/// <item>While dragging or resizing, the controller mutates geometry but
-/// never notifies; <see cref="IEditorInteractionHost.NotifyPrimitivesChanged"/>
-/// fires once on commit.</item>
-/// <item>Cancel restores the pre-gesture geometry from snapshots.</item>
+/// <item>按下后指针移动超过阈值才成为拖拽，避免点击时误移动。</item>
+/// <item>拖拽/缩放期间不通知，<see cref="IEditorInteractionHost.NotifyPrimitivesChanged"/> 在提交时触发一次。</item>
+/// <item>取消时从快照恢复手势前的几何状态。</item>
 /// </list>
 /// </remarks>
 public sealed class EditorInteractionController
 {
-    /// <summary>Move threshold in world units (1:1 with CSS pixels) that turns a press into a drag.</summary>
+    /// <summary>拖拽阈值（世界单位，与 CSS 像素 1:1）。</summary>
     public const float DragThresholdWorld = 3f;
 
     private readonly IEditorInteractionHost _host;
 
     private ControllerState _state = ControllerState.Idle;
 
-    // Press snapshot (click-vs-drag decision).
+    // 按下快照（点击/拖拽决策）
     private Point _pressStart;
     private Point _pressStartCss;
     private Primitive? _pressHit;
     private bool _pressDeferredCommit;
 
-    // Drag snapshot.
+    // 拖拽快照
     private List<Primitive> _dragItems = new();
     private Point _lastWorld;
     private Point _lastCss;
@@ -45,29 +38,27 @@ public sealed class EditorInteractionController
     private float _dragTotalDy;
     private bool _isPanGesture;
 
-    // Resize snapshot.
+    // 缩放快照
     private Primitive? _resizeTarget;
     private Box _resizeOriginalBounds;
     private ResizeHandle _resizeHandle;
 
-    // Drill-down snapshot: repeated clicks at the same spot advance the
-    // candidate index from the outermost container toward the deepest leaf.
+    // 钻取快照：同一位置连续点击，候选链从最外层容器向最深叶子递进
     private Point? _lastClickPosition;
     private DateTime _lastClickTime;
     private IReadOnlyList<Primitive> _drillCandidates = Array.Empty<Primitive>();
     private int _drillIndex;
 
-    // Empty-space press that may become a pan gesture.
+    // 空白按下，可能转为平移手势
     private bool _panPending;
 
-    // Whether the host was already told this gesture is mutating (captured
-    // once, at the first real geometry change).
+    // 宿主是否已被告知当前手势正在修改（首次实际修改时捕获一次）
     private bool _mutationCaptured;
 
     private const float DrillSlopWorld = 4f;
     private static readonly TimeSpan DrillInterval = TimeSpan.FromMilliseconds(500);
 
-    /// <summary>Gets the current controller state (for tests and diagnostics).</summary>
+    /// <summary>当前控制器状态（供测试和诊断）。</summary>
     public ControllerState State => _state;
 
     public EditorInteractionController(IEditorInteractionHost host)
@@ -75,11 +66,7 @@ public sealed class EditorInteractionController
         _host = host ?? throw new ArgumentNullException(nameof(host));
     }
 
-    /// <summary>
-    /// Handles a pointer press at world/CSS positions with the layered hit
-    /// result. World coordinates drive geometry gestures (drag/resize); CSS
-    /// coordinates drive the view pan.
-    /// </summary>
+    /// <summary>处理指针按下，接收世界/CSS 坐标和命中结果。</summary>
     public void PointerDown(Point world, Point css, HitTestResult hit, bool ctrl)
     {
         _pressStart = world;
@@ -99,9 +86,7 @@ public sealed class EditorInteractionController
             var primitive = hit.Primitive;
             if (ctrl)
             {
-                // Ctrl-click follows the drill direction too: the outermost
-                // candidate is appended (or toggled off when already
-                // selected), consistent with plain-click selection.
+                // Ctrl 点击也遵循钻取方向：追加最外层候选（已选中则切换移除）
                 var candidates = hit.Candidates is { Count: > 0 }
                     ? hit.Candidates
                     : new[] { primitive };
@@ -122,18 +107,14 @@ public sealed class EditorInteractionController
 
             if (_host.IsSelected(primitive) && _host.GetSelection().Count > 1)
             {
-                // Pressing an already-selected member of a multi-selection:
-                // defer the click decision until pointer-up, so the gesture
-                // can either collapse the selection (click) or drag the group.
+                // 点击已选中的多选成员：延迟到松开时决策（单击折叠选择 / 拖拽移动整组）
                 _pressHit = primitive;
                 _pressDeferredCommit = true;
                 _state = ControllerState.Pressed;
                 return;
             }
 
-            // Drill-down selection: the first click picks the outermost
-            // candidate (the root container when nested), and repeated
-            // clicks at the same spot descend toward the deepest leaf.
+            // 钻取选择：首击选最外层候选（嵌套时为根容器），同位置连续点击逐层向下
             var target = SelectDrillTarget(world, hit);
             _host.SetSelected(target);
             _pressHit = target;
@@ -144,15 +125,14 @@ public sealed class EditorInteractionController
 
         if (hit.InUnionBox)
         {
-            // Click inside the multi-selection union box: group drag.
+            // 点击在多选并集框内：整组拖拽
             _pressHit = null;
             _pressDeferredCommit = false;
             _state = ControllerState.Pressed;
             return;
         }
 
-        // Pressing empty space clears the selection; a drag that crosses the
-        // threshold pans the view instead.
+        // 空白按下清空选择；拖拽越过阈值则转为平移
         _host.ClearSelection();
         ClearDrillContext();
         _pressHit = null;
@@ -161,7 +141,7 @@ public sealed class EditorInteractionController
         _state = ControllerState.Pressed;
     }
 
-    /// <summary>Handles a pointer move at world/CSS positions.</summary>
+    /// <summary>处理指针移动。</summary>
     public void PointerMove(Point world, Point css)
     {
         switch (_state)
@@ -206,7 +186,7 @@ public sealed class EditorInteractionController
         }
     }
 
-    /// <summary>Handles pointer release; commits the gesture.</summary>
+    /// <summary>处理指针松开，提交手势。</summary>
     public void PointerUp(Point world)
     {
         switch (_state)
@@ -214,8 +194,7 @@ public sealed class EditorInteractionController
             case ControllerState.Pressed:
                 if (_pressDeferredCommit && _pressHit is not null)
                 {
-                    // Click on an already-selected member of a multi-selection
-                    // collapses the selection to that member.
+                    // 多选成员的单击折叠为该成员
                     _host.SetSelected(_pressHit);
                 }
 
@@ -241,10 +220,7 @@ public sealed class EditorInteractionController
         ResetGesture();
     }
 
-    /// <summary>
-    /// Cancels the active gesture (ESC, pointercancel, lost capture, window
-    /// blur) and restores the pre-gesture geometry from snapshots.
-    /// </summary>
+    /// <summary>取消当前手势（ESC / pointercancel / 丢失捕获 / 窗口失焦），恢复快照几何。</summary>
     public void Cancel()
     {
         switch (_state)
@@ -261,9 +237,7 @@ public sealed class EditorInteractionController
                 break;
 
             case ControllerState.Resizing:
-                // SetBounds(original, anchor) restores exactly for the current
-                // leaf shapes: rectangle passes through, circle and triangle
-                // are reversible fits of the original bounds.
+                // SetBounds(original, anchor) 对当前叶子形状可精确恢复
                 _resizeTarget?.SetBounds(
                     _resizeOriginalBounds,
                     ResizeMath.FixedCorner(_resizeOriginalBounds, _resizeHandle));
@@ -274,9 +248,7 @@ public sealed class EditorInteractionController
     }
 
     /// <summary>
-    /// Resolves the drill-down target: advances the candidate index when the
-    /// click repeats at the same spot on the same candidate chain, otherwise
-    /// restarts at the outermost candidate.
+    /// 解析钻取目标：同一位置重复点击同一候选链时推进索引，否则重置到最外层。
     /// </summary>
     private Primitive SelectDrillTarget(Point world, HitTestResult hit)
     {
@@ -327,9 +299,7 @@ public sealed class EditorInteractionController
     {
         if (_panPending)
         {
-            // Empty-space drag pans the view in CSS space; apply the full
-            // displacement from the press point so the content follows the
-            // pointer.
+            // 空白拖拽在 CSS 空间平移视口，从按下点计算全量位移使内容跟随指针
             _isPanGesture = true;
             _host.PanByCss(css.X - _pressStartCss.X, css.Y - _pressStartCss.Y);
             _lastCss = css;
@@ -340,9 +310,7 @@ public sealed class EditorInteractionController
         _dragItems = _host.GetSelection().ToList();
         CaptureMutation();
 
-        // Apply the full displacement from the press point so the selection
-        // follows the pointer from where it was pressed, not from where the
-        // threshold was crossed.
+        // 从按下点计算全量位移，使选区从按下位置开始跟随指针（而非从越过阈值处）
         float dx = world.X - _pressStart.X;
         float dy = world.Y - _pressStart.Y;
         _dragTotalDx = dx;
@@ -369,7 +337,7 @@ public sealed class EditorInteractionController
     }
 }
 
-/// <summary>The interaction controller's gesture states.</summary>
+/// <summary>交互控制器的手势状态。</summary>
 public enum ControllerState
 {
     Idle,

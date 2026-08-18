@@ -3,15 +3,10 @@ using Penelopa.Core.Primitives;
 namespace Penelopa.Core.Services;
 
 /// <summary>
-/// Undo/redo history for the document. A snapshot captures the primitive
-/// tree by reference plus every primitive's property values and container
-/// children; applying a snapshot restores those values and rebuilds the root
-/// list through <see cref="IPrimitiveService.ReplaceAll"/>. Selection is UI
-/// state, not document state: it is never captured, and undo/redo preserves
-/// the live selection filtered to the primitives that survive the restore.
-/// Snapshots are taken only BEFORE a real mutation (a structural change or
-/// the start of a drag/resize gesture), so non-mutating clicks never create
-/// an undo entry.
+/// 文档撤销/重做历史。快照按引用捕获图元树及每个图元的属性值和容器子元素；
+/// 应用快照时恢复这些值并通过 <see cref="IPrimitiveService.ReplaceAll"/> 重建根列表。
+/// 选区是 UI 状态而非文档状态：不被捕获，撤销/重做保留恢复后仍存活的选区。
+/// 快照仅在真实修改前捕获（结构变更或拖拽/缩放手势开始），非修改性点击不产生撤销条目。
 /// </summary>
 public sealed class DocumentHistory
 {
@@ -24,22 +19,20 @@ public sealed class DocumentHistory
         _service = service ?? throw new ArgumentNullException(nameof(service));
     }
 
-    /// <summary>Gets whether an undo is available.</summary>
+    /// <summary>是否可撤销。</summary>
     public bool CanUndo => _undoStack.Count > 0;
 
-    /// <summary>Gets whether a redo is available.</summary>
+    /// <summary>是否可重做。</summary>
     public bool CanRedo => _redoStack.Count > 0;
 
-    /// <summary>
-    /// Captures the current document state for undo. Call before a mutation.
-    /// </summary>
+    /// <summary>捕获当前文档状态以供撤销。在修改前调用。</summary>
     public void Capture()
     {
         _undoStack.Push(DocumentSnapshot.Capture(_service.GetAll().ToList()));
         _redoStack.Clear();
     }
 
-    /// <summary>Undoes the most recent capture.</summary>
+    /// <summary>撤销最近的捕获。</summary>
     public void Undo()
     {
         if (_undoStack.Count == 0)
@@ -53,7 +46,7 @@ public sealed class DocumentHistory
         target.Apply(_service);
     }
 
-    /// <summary>Redoes the most recently undone capture.</summary>
+    /// <summary>重做最近撤销的捕获。</summary>
     public void Redo()
     {
         if (_redoStack.Count == 0)
@@ -67,7 +60,7 @@ public sealed class DocumentHistory
         target.Apply(_service);
     }
 
-    /// <summary>Clears both stacks (document replaced externally).</summary>
+    /// <summary>清空两个栈（文档被外部替换时）。</summary>
     public void Clear()
     {
         _undoStack.Clear();
@@ -75,7 +68,7 @@ public sealed class DocumentHistory
     }
 }
 
-/// <summary>A point-in-time capture of the primitive tree.</summary>
+/// <summary>图元树的某一时刻快照。</summary>
 public sealed class DocumentSnapshot
 {
     private readonly List<Primitive> _roots;
@@ -130,14 +123,12 @@ public sealed class DocumentSnapshot
         }
     }
 
-    /// <summary>Restores this snapshot onto the service (roots and property values).</summary>
+    /// <summary>将此快照恢复到服务上（根列表和属性值）。</summary>
     public void Apply(IPrimitiveService service)
     {
-        // Reconstruct this snapshot's node set from the CAPTURED structure
-        // (_children), not the live tree: container.Children has already
-        // diverged from the snapshot by the time Apply runs (the mutation this
-        // undo is rolling back already happened), so walking the live children
-        // would wrongly include nodes the snapshot does not own.
+        // 从捕获的结构（_children）重建快照的节点集，而非活跃树：
+        // container.Children 在 Apply 运行时已偏离快照（本次撤销回退的修改已发生），
+        // 遍历活跃子元素会错误地包含快照不拥有的节点。
         var snapshotNodes = new List<Primitive>();
         var snapshotSet = new HashSet<Primitive>();
         foreach (var root in _roots)
@@ -145,7 +136,7 @@ public sealed class DocumentSnapshot
             CollectSnapshotNodes(root, snapshotNodes, snapshotSet);
         }
 
-        // Restore container children (structure may have changed).
+        // 恢复容器子元素（结构可能已变更）
         foreach (var (containerId, savedChildren) in _children)
         {
             var container = snapshotNodes.FirstOrDefault(p => p is Container c && c.Id == containerId) as Container;
@@ -165,14 +156,13 @@ public sealed class DocumentSnapshot
             }
         }
 
-        // Preserve the live selection across the restore: selection is UI
-        // state and is not part of the snapshot, and ReplaceAll clears it, so
-        // remember it first and re-apply only the survivors afterwards.
+        // 保留活跃选区跨恢复：选区是 UI 状态，不在快照中，ReplaceAll 会清空它，
+        // 因此先记住，恢复后仅重新应用仍存活的项。
         var liveSelection = service.GetSelection().ToList();
 
         service.ReplaceAll(_roots, clearHistory: false);
 
-        // Restore property values.
+        // 恢复属性值
         foreach (var primitive in snapshotNodes)
         {
             if (!_props.TryGetValue(primitive.Id, out var values))
@@ -191,8 +181,7 @@ public sealed class DocumentSnapshot
             }
         }
 
-        // Re-apply the live selection, keeping only primitives that survive
-        // this restore (primitives added by the undone mutation drop out).
+        // 重新应用活跃选区，仅保留本次恢复后仍存活的图元（被撤销修改新增的图元会丢弃）
         service.SetSelectedRange(liveSelection.Where(snapshotSet.Contains));
     }
 

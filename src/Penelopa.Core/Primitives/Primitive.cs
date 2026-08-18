@@ -3,8 +3,7 @@ using Penelopa.Core.Alignment;
 namespace Penelopa.Core.Primitives;
 
 /// <summary>
-/// Base class for geometric primitives that expose a set of named properties
-/// and can be translated in world space.
+/// 几何图元基类：暴露一组命名属性，可在世界空间中平移。
 /// </summary>
 public abstract class Primitive : IAlignable
 {
@@ -28,12 +27,11 @@ public abstract class Primitive : IAlignable
         Props.Add(propValue);
     }
 
-    /// <summary>Gets the parent container, or null for root primitives.</summary>
+    /// <summary>父容器，根图元为 null。</summary>
     public Primitive? Parent { get; internal set; }
 
-    /// <summary>Gets the world-space axis-aligned bounding box.</summary>
-    /// <remarks>Leaf primitives report their local bounds; the base class
-    /// maps them through the parent container chain to world space.</remarks>
+    /// <summary>世界空间轴对齐包围盒。</summary>
+    /// <remarks>叶子图元返回局部包围盒，基类通过父容器链映射到世界空间。</remarks>
     public Box GetWorldBoundingBox()
     {
         var box = GetLocalBoundingBox();
@@ -48,18 +46,14 @@ public abstract class Primitive : IAlignable
         return box;
     }
 
-    /// <summary>
-    /// Gets the primitive's bounding box in its own (parent-relative) space.
-    /// </summary>
+    /// <summary>图元在自身（父相对）空间中的包围盒。</summary>
     protected abstract Box GetLocalBoundingBox();
 
-    /// <summary>Internal bridge for containers to query a child's local bounds.</summary>
+    /// <summary>内部桥接：供容器查询子图元的局部包围盒。</summary>
     internal Box GetParentLocalBoundingBox() => GetLocalBoundingBox();
 
     /// <summary>
-    /// Translates the primitive by a world-space delta. Container children
-    /// convert the delta through the parent chain so the movement follows
-    /// the pointer even inside rotated containers.
+    /// 按世界空间增量平移图元。容器内的子图元通过父链转换增量，确保在旋转容器内移动也跟随指针。
     /// </summary>
     public void Translate(float deltaX, float deltaY)
     {
@@ -74,20 +68,15 @@ public abstract class Primitive : IAlignable
         }
     }
 
-    /// <summary>Moves the primitive by a delta in its local space.</summary>
+    /// <summary>在局部空间中按增量移动。</summary>
     protected abstract void TranslateLocal(float deltaX, float deltaY);
 
-    /// <summary>
-    /// Fits the primitive's geometry into the given world-space bounding box.
-    /// </summary>
-    /// <param name="bounds">The target world-space axis-aligned bounds.</param>
-    /// <param name="anchor">The fixed corner of a resize gesture. Shapes that
-    /// re-center themselves (such as a circle) keep this point on their
-    /// boundary so the opposite corner follows the pointer; shapes that fill
-    /// the box directly ignore it.</param>
-    /// <returns>The actual fitted bounds in world space. Shapes that preserve
-    /// an aspect ratio (such as a circle) may not fill the target exactly, so
-    /// callers must use the returned box to correct the selection overlay.</returns>
+    /// <summary>将图元几何拟合到给定的世界空间包围盒。</summary>
+    /// <param name="bounds">目标世界空间轴对齐包围盒。</param>
+    /// <param name="anchor">缩放手势的固定角。会重新居中的形状（如圆）保持此点在边界上；
+    /// 直接填充的形状忽略此参数。</param>
+    /// <returns>实际拟合后的世界空间包围盒。保持宽高比的形状可能不完全填满目标，
+    /// 调用方须用返回值修正选区叠加层。</returns>
     public Box SetBounds(Box bounds, Point anchor)
     {
         if (Parent is Container container)
@@ -100,17 +89,12 @@ public abstract class Primitive : IAlignable
         return SetBoundsLocal(bounds, anchor);
     }
 
-    /// <summary>Fits the primitive's geometry into a bounds in its local space.</summary>
+    /// <summary>在局部空间中拟合到给定包围盒。</summary>
     protected abstract Box SetBoundsLocal(Box bounds, Point anchor);
 
-    /// <summary>
-    /// Returns whether the given world point lies inside the primitive's
-    /// shape. Used by hit-through candidate collection and marquee tests.
-    /// </summary>
+    /// <summary>判断给定的世界空间点是否在图元形状内。用于穿透候选收集和框选测试。</summary>
     public bool ContainsWorldPoint(Point point)
     {
-        // A container maps the world point through its own (and its
-        // ancestors') inverse transform; a leaf maps through its parent chain.
         if (this is Container self)
         {
             return ContainsLocalPoint(self.ToLocalPoint(point));
@@ -124,10 +108,10 @@ public abstract class Primitive : IAlignable
         return ContainsLocalPoint(point);
     }
 
-    /// <summary>Tests a point in the primitive's local space against its shape.</summary>
+    /// <summary>在图元局部空间中测试点是否在形状内。</summary>
     protected abstract bool ContainsLocalPoint(Point point);
 
-    /// <summary>Internal bridge for containers to test a child's local shape.</summary>
+    /// <summary>内部桥接：供容器测试子图元的局部形状。</summary>
     internal bool ContainsParentLocalPoint(Point point) => ContainsLocalPoint(point);
 
     /// <inheritdoc/>
@@ -140,10 +124,7 @@ public abstract class Primitive : IAlignable
         Translate(position.X - currentPos.X, position.Y - currentPos.Y);
     }
 
-    /// <summary>
-    /// Gets the top-left anchor of the bounding box in screen coordinates
-    /// (x grows right, y grows down, so the anchor is (MinX, MaxY)).
-    /// </summary>
+    /// <summary>屏幕坐标下包围盒的左上锚点（x 右增、y 下增，锚点为 (MinX, MaxY)）。</summary>
     protected Point GetCurrentPosition()
     {
         var bbox = GetWorldBoundingBox();
@@ -151,9 +132,7 @@ public abstract class Primitive : IAlignable
     }
 }
 
-/// <summary>
-/// A circle defined by a center and a radius.
-/// </summary>
+/// <summary>圆形：中心 + 半径。</summary>
 public class Circle : Primitive
 {
     public Circle() : base("Circle")
@@ -191,10 +170,8 @@ public class Circle : Primitive
 
     protected override Box SetBoundsLocal(Box bounds, Point anchor)
     {
-        // A circle keeps its aspect. The anchor is the resize gesture's
-        // fixed corner and stays on the circle: the center is derived from
-        // the anchor plus the inscribed radius, so the circle grows from the
-        // fixed corner instead of re-centering in the target box.
+        // 圆保持宽高比。锚点是缩放手势的固定角，保持在圆边界上：
+        // 中心由锚点 + 内切半径推导，圆从固定角生长而非在目标框中重新居中。
         float radius = MathF.Max(0f, MathF.Min(bounds.Width, bounds.Height) * 0.5f);
 
         const float eps = 1e-4f;
@@ -215,9 +192,7 @@ public class Circle : Primitive
     }
 }
 
-/// <summary>
-/// A rectangle defined by a top-left position and a size.
-/// </summary>
+/// <summary>矩形：左上角位置 + 尺寸。</summary>
 public class Rectangle : Primitive
 {
     public Rectangle() : base("Rectangle")
@@ -273,9 +248,7 @@ public class Rectangle : Primitive
     }
 }
 
-/// <summary>
-/// A triangle defined by three vertices.
-/// </summary>
+/// <summary>三角形：三个顶点。</summary>
 public class Triangle : Primitive
 {
     public Triangle() : base("Triangle")
@@ -323,9 +296,7 @@ public class Triangle : Primitive
 
     protected override Box SetBoundsLocal(Box bounds, Point anchor)
     {
-        // Map the vertices by their normalized position inside the current
-        // bounds, so the triangle's shape is preserved while filling the
-        // target box exactly. The anchor is implicit in the box's corners.
+        // 按顶点在当前包围盒中的归一化位置映射，保持形状同时精确填充目标框。锚点隐含在框的角中。
         var current = GetWorldBoundingBox();
         float scaleX = current.Width > 1e-6f ? bounds.Width / current.Width : 0f;
         float scaleY = current.Height > 1e-6f ? bounds.Height / current.Height : 0f;
@@ -344,12 +315,11 @@ public class Triangle : Primitive
         var box = GetLocalBoundingBox();
         if (box.Width < 1e-6f || box.Height < 1e-6f)
         {
-            // Degenerate (zero-area) triangles are not hittable.
+            // 退化（零面积）三角形不可命中
             return false;
         }
 
-        // Cross-product sign test: the point is inside (or on the boundary)
-        // when all three edge tests share a sign.
+        // 叉积符号测试：三条边测试同号则在内部（或边界上）
         float d1 = Cross(point, new Point(Vertex1X.Value, Vertex1Y.Value), new Point(Vertex2X.Value, Vertex2Y.Value));
         float d2 = Cross(point, new Point(Vertex2X.Value, Vertex2Y.Value), new Point(Vertex3X.Value, Vertex3Y.Value));
         float d3 = Cross(point, new Point(Vertex3X.Value, Vertex3Y.Value), new Point(Vertex1X.Value, Vertex1Y.Value));

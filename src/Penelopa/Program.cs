@@ -10,10 +10,10 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-// Atlas.Blazor workspace services (workspace factory, content routing, history).
+// Atlas.Blazor 工作区服务（工作区工厂、内容路由、历史）
 builder.Services.AddAtlasWorkspace();
 
-// Primitive store and selection shared by the editor panels.
+// 编辑器面板共享的图元存储和选区
 builder.Services.AddSingleton<IPrimitiveService, PrimitiveService>();
 
 await builder.Build().RunAsync();

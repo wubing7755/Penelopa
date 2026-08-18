@@ -6,13 +6,10 @@ using SkiaSharp;
 namespace Penelopa.Rendering;
 
 /// <summary>
-/// Renders primitives onto a render-target-sized bitmap and performs color-key
-/// hit testing. The visible canvas and the off-screen hit buffer share one
-/// <see cref="ViewTransform"/> (origin at bottom-left, Y grows up, scaled by
-/// the device pixel ratio), so a CSS screen pixel from the mouse maps into the
-/// hit buffer through the same transform that positioned the visible content.
-/// The render target size is supplied by the host from the SKGLView event
-/// (<c>e.Info</c>), never inferred from the canvas device bounds.
+/// 将图元渲染到渲染目标尺寸的位图，并执行颜色键命中测试。可见画布与屏下命中缓冲区共享同一个
+/// <see cref="ViewTransform"/>（原点在左下角，Y 向上，按设备像素比缩放），因此鼠标的 CSS 屏幕像素
+/// 通过与定位可见内容相同的变换映射到命中缓冲区。渲染目标尺寸由宿主从 SKGLView 事件
+/// (<c>e.Info</c>) 提供，不从画布设备边界推断。
 /// </summary>
 public sealed class CanvasRenderer
 {
@@ -22,9 +19,8 @@ public sealed class CanvasRenderer
     private SKBitmap _hitBitmap = new(new SKImageInfo(FallbackCanvasSize, FallbackCanvasSize));
     private ViewTransform _viewTransform = new(FallbackCanvasSize, FallbackCanvasSize, 1f);
 
-    // Color keys are assigned per render (see DrawPrimitives): the hit buffer
-    // is rebuilt every frame, so the key only needs to be consistent within a
-    // single render→hit cycle. No persistent global registry is required.
+    // 颜色键按帧分配（见 DrawPrimitives）：命中缓冲区每帧重建，
+    // 因此键只需在单次 渲染→命中 周期内一致。不需要持久全局注册表。
     private readonly Dictionary<uint, Primitive> _colorMap = new();
     private uint _nextColorKey = FirstColorKey;
 
@@ -57,19 +53,14 @@ public sealed class CanvasRenderer
         Edging = SKFontEdging.Antialias,
     };
 
-    /// <summary>
-    /// Renders the primitives to the canvas and refreshes the hit buffer.
-    /// </summary>
-    /// <param name="canvas">The target canvas from the SKGLView paint event.</param>
-    /// <param name="info">The user-visible render target size
-    /// (<c>SKPaintGLSurfaceEventArgs.Info</c>, in physical pixels when
-    /// <c>IgnorePixelScaling</c> is false). Do not pass the raw info of a
-    /// scaled surface, or the coordinate spaces diverge.</param>
-    /// <param name="devicePixelRatio">The CSS-to-physical pixel ratio
-    /// (<c>window.devicePixelRatio</c>).</param>
-    /// <param name="primitives">The primitives to draw.</param>
-    /// <param name="selection">The current selection; when non-empty, a
-    /// selection box (and corner handles for a single item) is drawn on top.</param>
+    /// <summary>将图元渲染到画布并刷新命中缓冲区。</summary>
+    /// <param name="canvas">SKGLView 绘制事件的目标画布。</param>
+    /// <param name="info">用户可见的渲染目标尺寸
+    /// (<c>SKPaintGLSurfaceEventArgs.Info</c>，<c>IgnorePixelScaling</c> 为 false 时为物理像素)。
+    /// 不要传缩放表面的原始 info，否则坐标空间会不一致。</param>
+    /// <param name="devicePixelRatio">CSS 到物理像素的比率（<c>window.devicePixelRatio</c>）。</param>
+    /// <param name="primitives">要绘制的图元。</param>
+    /// <param name="selection">当前选区；非空时在最上层绘制选区框（单项时含角柄）。</param>
     public void Render(
         SKCanvas canvas,
         SKImageInfo info,
@@ -84,16 +75,13 @@ public sealed class CanvasRenderer
         DrawSelectionOverlay(canvas, selection);
     }
 
-    /// <summary>Gets the current view transform (zoom/pan state).</summary>
+    /// <summary>当前视口变换（缩放/平移状态）。</summary>
     public ViewTransform CurrentViewTransform => _viewTransform;
 
-    /// <summary>Replaces the view transform (zoom/pan).</summary>
+    /// <summary>替换视口变换（缩放/平移）。</summary>
     public void SetViewTransform(ViewTransform transform) => _viewTransform = transform;
 
-    /// <summary>
-    /// Zooms to <paramref name="newZoom"/> keeping the world point under the
-    /// CSS cursor fixed (wheel-zoom around the pointer).
-    /// </summary>
+    /// <summary>缩放到 <paramref name="newZoom"/>，保持 CSS 光标下的世界点固定（围绕指针滚轮缩放）。</summary>
     public void ZoomAt(float cssX, float cssY, float newZoom)
     {
         var view = _viewTransform.ScreenToView(cssX, cssY);
@@ -112,7 +100,7 @@ public sealed class CanvasRenderer
             panY);
     }
 
-    /// <summary>Pans the view by a CSS-pixel delta.</summary>
+    /// <summary>按 CSS 像素增量平移视口。</summary>
     public void PanBy(float cssDx, float cssDy)
     {
         _viewTransform = new ViewTransform(
@@ -124,11 +112,7 @@ public sealed class CanvasRenderer
             _viewTransform.PanY + cssDy);
     }
 
-    /// <summary>
-    /// Fits the content bounds into the viewport with padding, centering the
-    /// content (zoom may shrink or enlarge; empty content leaves the view
-    /// unchanged).
-    /// </summary>
+    /// <summary>将内容边界适配到视口（带内边距），居中显示内容（缩放可缩小或放大；空内容不变）。</summary>
     public void FitToContent(IReadOnlyList<Primitive> primitives, float paddingCss = 40f)
     {
         if (primitives.Count == 0)
@@ -158,11 +142,7 @@ public sealed class CanvasRenderer
             panY);
     }
 
-    /// <summary>
-    /// Updates the device pixel ratio used by subsequent hit tests, keeping
-    /// pointer coordinates in sync with the most recent display scale without
-    /// waiting for the next render frame.
-    /// </summary>
+    /// <summary>更新后续命中测试使用的设备像素比，使指针坐标无需等待下一渲染帧即可与最新显示比例同步。</summary>
     public void SetDevicePixelRatio(float devicePixelRatio)
     {
         if (_viewTransform.DevicePixelRatio == devicePixelRatio)
@@ -196,11 +176,7 @@ public sealed class CanvasRenderer
         }
     }
 
-    /// <summary>
-    /// Returns the primitive under a CSS screen pixel, or null when the pixel
-    /// is empty. The coordinates are the browser event coordinates over the
-    /// canvas (origin at top-left, Y grows down).
-    /// </summary>
+    /// <summary>返回 CSS 屏幕像素下的图元，像素为空时返回 null。坐标为浏览器事件在画布上的坐标（原点在左上角，Y 向下）。</summary>
     public Primitive? HitTest(float screenCssX, float screenCssY)
     {
         var view = _viewTransform.ScreenToView(screenCssX, screenCssY);
@@ -216,11 +192,7 @@ public sealed class CanvasRenderer
         return _colorMap.TryGetValue(colorKey, out var primitive) ? primitive : null;
     }
 
-    /// <summary>
-    /// Tests whether a CSS screen point hits one of the selection box's
-    /// corner handles, in screen space. Handles are fixed-size screen
-    /// elements, so the test uses CSS pixels independent of world scale.
-    /// </summary>
+    /// <summary>测试 CSS 屏幕点是否命中选区框的角柄（屏幕空间）。角柄为固定大小的屏幕元素，测试使用 CSS 像素，与世界缩放无关。</summary>
     public ResizeHandle? HitTestHandles(float screenCssX, float screenCssY, Box worldBounds)
     {
         const float hitRadiusCss = 5f;
@@ -237,11 +209,7 @@ public sealed class CanvasRenderer
         return null;
     }
 
-    /// <summary>
-    /// Tests whether a CSS screen point lies inside the world bounds projected
-    /// to screen space (the multi-selection union box, used as a group-drag
-    /// handle).
-    /// </summary>
+    /// <summary>测试 CSS 屏幕点是否在投影到屏幕空间的世界包围盒内（多选并集框，用作整组拖拽柄）。</summary>
     public bool HitTestUnionBox(float screenCssX, float screenCssY, Box worldBounds)
     {
         var topLeft = ToCss(new Point(worldBounds.MinX, worldBounds.MaxY));
@@ -250,11 +218,7 @@ public sealed class CanvasRenderer
             && screenCssY >= topLeft.Y && screenCssY <= bottomRight.Y;
     }
 
-    /// <summary>
-    /// Runs the layered hit test for the interaction layer: corner handle
-    /// (single selection), then primitive color key, then the multi-selection
-    /// union box.
-    /// </summary>
+    /// <summary>交互层的分层命中测试：角柄（单选）→ 图元颜色键 → 多选并集框。</summary>
     public HitTestResult HitTestSelection(float screenCssX, float screenCssY, IReadOnlyList<Primitive> selection)
     {
         if (selection.Count == 1)
@@ -285,9 +249,7 @@ public sealed class CanvasRenderer
         return default;
     }
 
-    /// <summary>
-    /// Converts a CSS screen point to world coordinates.
-    /// </summary>
+    /// <summary>CSS 屏幕点 → 世界坐标。</summary>
     public Point CssToWorld(float screenCssX, float screenCssY)
     {
         var view = _viewTransform.ScreenToView(screenCssX, screenCssY);
@@ -296,11 +258,8 @@ public sealed class CanvasRenderer
     }
 
     /// <summary>
-    /// Collects the drill-down candidates at a point: the topmost primitive
-    /// from the color-key buffer plus its ancestor chain, ordered from the
-    /// outermost container (root) to the deepest leaf. This is the confirmed
-    /// drill direction: the first click selects the outermost container and
-    /// further clicks descend toward the inner shape.
+    /// 收集某点的钻取候选：颜色键缓冲区的最顶层图元 + 其祖先链，
+    /// 从最外层容器（根）到最深叶子排序。确认的钻取方向：首击选最外层容器，后续点击向内层形状深入。
     /// </summary>
     public IReadOnlyList<Primitive> PickAll(float screenCssX, float screenCssY)
     {
@@ -330,8 +289,7 @@ public sealed class CanvasRenderer
         canvas.Save();
         try
         {
-            // World mode: one world unit equals one CSS pixel, so handles
-            // drawn at HandleSizeCss units are fixed-size on screen.
+            // 世界模式：1 世界单位 = 1 CSS 像素，因此以 HandleSizeCss 单位绘制的角柄在屏幕上固定大小
             _viewTransform.ApplyTo(canvas);
 
             if (selection.Count == 1)
@@ -351,8 +309,7 @@ public sealed class CanvasRenderer
 
     private void DrawSelectionBox(SKCanvas canvas, Box bounds, bool drawHandles)
     {
-        // World mode: one world unit equals one CSS pixel * Zoom, so dividing
-        // by Zoom keeps the outline width and handle size fixed on screen.
+        // 世界模式：1 世界单位 = 1 CSS 像素 × Zoom，除以 Zoom 保持轮廓宽度和角柄大小在屏幕上固定
         float inverseZoom = 1f / _viewTransform.Zoom;
         using var outline = new SKPaint
         {
@@ -424,12 +381,10 @@ public sealed class CanvasRenderer
             _viewTransform.ApplyTo(canvas);
             _viewTransform.ApplyTo(hitCanvas);
 
-            // Axis indicator sits under the primitives; it never enters the
-            // hit buffer so the axes stay non-interactive.
+            // 坐标轴指示器在图元下方；不进入命中缓冲区，保持轴不可交互
             DrawCoordinateSystem(canvas);
 
-            // Rebuild the per-frame color-key map before drawing so the hit
-            // buffer and its lookup table stay in sync for this frame.
+            // 绘制前重建每帧颜色键映射，使命中缓冲区与查找表在本帧内保持同步
             _colorMap.Clear();
             _nextColorKey = FirstColorKey;
 
@@ -446,11 +401,8 @@ public sealed class CanvasRenderer
     }
 
     /// <summary>
-    /// Draws a primitive tree node. Containers save the canvas state, apply
-    /// their transform to BOTH canvases (visible and hit must stay
-    /// synchronized so the color-key hit test matches what is drawn), recurse
-    /// into children, then restore. Render order equals Z order: later nodes
-    /// cover earlier ones.
+    /// 绘制图元树节点。容器保存画布状态，将变换应用到两个画布（可见画布和命中画布必须同步，
+    /// 使颜色键命中测试与绘制内容一致），递归子元素后恢复。渲染顺序即 Z 序：后绘制覆盖先绘制。
     /// </summary>
     private void DrawNode(SKCanvas canvas, SKCanvas hitCanvas, Primitive node)
     {
@@ -489,9 +441,8 @@ public sealed class CanvasRenderer
     }
 
     /// <summary>
-    /// Assigns the next per-frame color key to a primitive and records the
-    /// mapping used by <see cref="HitTest"/>. Keys are only valid until the
-    /// next render, which is exactly the lifetime of the hit buffer.
+    /// 为图元分配下一个每帧颜色键并记录 <see cref="HitTest"/> 使用的映射。
+    /// 键仅在下次渲染前有效，即命中缓冲区的生命周期。
     /// </summary>
     private uint RegisterHitKey(Primitive node)
     {
@@ -500,7 +451,7 @@ public sealed class CanvasRenderer
         return key;
     }
 
-    /// <summary>Converts the Core affine transform to an Skia matrix.</summary>
+    /// <summary>Core 仿射变换 → Skia 矩阵。</summary>
     private static SKMatrix ToSkMatrix(Transform transform)
     {
         var matrix = new SKMatrix
@@ -536,9 +487,8 @@ public sealed class CanvasRenderer
         {
             Color = new SKColor(color.R, color.G, color.B, color.A),
             Style = SKPaintStyle.Fill,
-            // The hit buffer must stay exact: antialiasing would blend edge
-            // pixels into colors that match no registered key, making 1px
-            // edges unhittable and breaking top-pixel/candidate consistency.
+            // 命中缓冲区必须精确：抗锯齿会将边缘像素混入不匹配任何注册键的颜色，
+            // 使 1px 边缘不可命中并破坏顶部像素/候选一致性
             IsAntialias = false,
         };
         hitCanvas.DrawCircle(circle.CenterX.Value, circle.CenterY.Value, circle.Radius.Value, paint);
@@ -610,11 +560,7 @@ public sealed class CanvasRenderer
         hitCanvas.DrawPath(path, paint);
     }
 
-    /// <summary>
-    /// Draws the coordinate system in world mode: the origin (0,0) is the
-    /// canvas center, so X and Y axes span the whole canvas and a center
-    /// marker makes the origin explicit.
-    /// </summary>
+    /// <summary>世界模式下绘制坐标系：原点 (0,0) 在画布中心，X/Y 轴跨越整个画布，中心标记显式显示原点。</summary>
     private void DrawCoordinateSystem(SKCanvas canvas)
     {
         float halfW = _viewTransform.ViewWidth / (2f * _viewTransform.DevicePixelRatio);
@@ -645,8 +591,7 @@ public sealed class CanvasRenderer
             canvas.DrawPath(yArrow, _arrowPaint);
         }
 
-        // Text renders upside down under the world y-flip; flip once so the
-        // labels read normally.
+        // 文本在世界 Y 翻转下倒置；翻转一次使标签正常阅读
         canvas.Save();
         canvas.Scale(1, -1);
         canvas.DrawText("X", halfW - 16, 12, _textFont, _textPaint);

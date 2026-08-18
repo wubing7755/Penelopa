@@ -1,22 +1,17 @@
 namespace Penelopa.Core.Alignment;
 
 /// <summary>
-/// Aligns a set of <see cref="IAlignable"/> items against the union of their
-/// bounding boxes, using the same alignment value (edge or center) as the
-/// reference for every item.
+/// 将一组 <see cref="IAlignable"/> 项对齐到它们包围盒并集的同一参考值（边或中心）。
 /// </summary>
 public static class AlignExtensions
 {
     private const float Tolerance = 1e-6f;
 
-    /// <summary>
-    /// Aligns a set of alignable items to a common reference.
-    /// </summary>
-    /// <typeparam name="T">The alignable item type.</typeparam>
-    /// <param name="items">The items to align.</param>
-    /// <param name="type">The alignment direction.</param>
-    /// <returns>True when an alignment was applied; false when the items were
-    /// already aligned or there are fewer than two items.</returns>
+    /// <summary>对一组可对齐项执行对齐操作。</summary>
+    /// <typeparam name="T">可对齐项类型。</typeparam>
+    /// <param name="items">待对齐的项集合。</param>
+    /// <param name="type">对齐方向。</param>
+    /// <returns>已执行对齐返回 true；项数少于两个或已经对齐则返回 false。</returns>
     public static bool Align<T>(this IEnumerable<T> items, AlignType type) where T : IAlignable
     {
         var list = items.ToList();
@@ -25,20 +20,19 @@ public static class AlignExtensions
             return false;
         }
 
-        // Capture the current state of every item.
+        // 快照每项当前状态
         var boxes = list.Select(item => item.GetWorldBoundingBox()).ToList();
         var originalPositions = list.Select(item => item.GetWorldPosition()).ToList();
 
-        // The union of all bounding boxes is the alignment reference.
+        // 所有包围盒的并集作为对齐参考
         var unionBox = MergeBoxes(boxes);
 
-        // Nothing to do when the items are already aligned.
         if (IsAlreadyAligned(boxes, type, unionBox))
         {
             return false;
         }
 
-        // Translate each item by the offset to its target alignment value.
+        // 按偏移量逐项平移
         for (int i = 0; i < list.Count; i++)
         {
             var item = list[i];
@@ -53,7 +47,6 @@ public static class AlignExtensions
         return true;
     }
 
-    /// <summary>Merges bounding boxes into a single union box.</summary>
     private static Box MergeBoxes(IReadOnlyList<Box> boxes)
     {
         float minX = float.MaxValue, minY = float.MaxValue;
@@ -70,7 +63,6 @@ public static class AlignExtensions
         return new Box(minX, minY, maxX, maxY);
     }
 
-    /// <summary>Checks whether the boxes are already aligned by the given type.</summary>
     private static bool IsAlreadyAligned(IReadOnlyList<Box> boxes, AlignType type, Box referenceBox)
     {
         float referenceValue = GetAlignmentValue(referenceBox, type);
@@ -78,13 +70,11 @@ public static class AlignExtensions
         return boxes.All(box => Math.Abs(GetAlignmentValue(box, type) - referenceValue) < Tolerance);
     }
 
-    /// <summary>Computes the translation needed to align a box to the reference.</summary>
     private static (float dx, float dy) CalculateOffset(Box box, AlignType type, Box referenceBox)
     {
         return type switch
         {
-            // Screen coordinates grow downward, so the visual top edge is MaxY
-            // and the visual bottom edge is MinY (kept from the original demo).
+            // 屏幕 Y 轴向下增长：视觉顶部 = MaxY，底部 = MinY
             AlignType.Left => (referenceBox.MinX - box.MinX, 0),
             AlignType.HCenter => (referenceBox.CenterX - box.CenterX, 0),
             AlignType.Right => (referenceBox.MaxX - box.MaxX, 0),
@@ -95,7 +85,6 @@ public static class AlignExtensions
         };
     }
 
-    /// <summary>Gets the alignment value of a box for the given type.</summary>
     private static float GetAlignmentValue(Box box, AlignType type) => type switch
     {
         AlignType.Left => box.MinX,

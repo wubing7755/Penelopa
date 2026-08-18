@@ -2,8 +2,7 @@ using Penelopa.Core.Alignment;
 
 namespace Penelopa.Core.Primitives;
 
-/// <summary>The container's editing semantics, which decides which transform
-/// properties are editable in the property panel.</summary>
+/// <summary>容器的编辑语义，决定属性面板暴露哪些变换属性。</summary>
 public enum ContainerKind
 {
     Offset,
@@ -12,17 +11,10 @@ public enum ContainerKind
 }
 
 /// <summary>
-/// A container groups child primitives and applies an affine transform to
-/// them — the A661-style rotation / offset / flip container variants are all
-/// factory forms of the same type. The transform is a TRS (translate ·
-/// rotate · scale) combination driven by editable properties, so the
-/// property panel can change the container's offset, rotation, and scale
-/// like any other primitive. Only the properties relevant to the
-/// <see cref="ContainerKind"/> are exposed for editing. The container itself
-/// has no visible shape; children render inside its transform and hit
-/// testing follows the rendered pixels. Its world bounding box is the AABB
-/// of the transformed children, so selection boxes and alignment work
-/// unchanged.
+/// 容器对子图元施加仿射变换（A661 风格的旋转/偏移/翻转均为同一类型的工厂形态）。
+/// 变换由可编辑属性驱动的 TRS（平移·旋转·缩放）组合构成，属性面板可像操作普通图元一样修改偏移、旋转和缩放。
+/// 仅暴露 <see cref="ContainerKind"/> 相关的属性供编辑。容器本身无可见形状，子图元在其变换内渲染，
+/// 命中测试跟随渲染像素。世界包围盒为变换后子图元的 AABB，选区框和对齐无需特殊处理。
 /// </summary>
 public sealed class Container : Primitive
 {
@@ -61,44 +53,40 @@ public sealed class Container : Primitive
         }
     }
 
-    /// <summary>Gets the container's editing kind (decides the exposed props).</summary>
+    /// <summary>容器编辑类型（决定暴露的属性集）。</summary>
     public ContainerKind Kind { get; }
 
-    /// <summary>Gets or sets the X offset property (editable in the panel).</summary>
+    /// <summary>X 偏移属性（属性面板可编辑）。</summary>
     public FloatPropValue OffsetX { get; }
 
-    /// <summary>Gets or sets the Y offset property (editable in the panel).</summary>
+    /// <summary>Y 偏移属性（属性面板可编辑）。</summary>
     public FloatPropValue OffsetY { get; }
 
-    /// <summary>Gets or sets the rotation in degrees (editable in the panel).</summary>
+    /// <summary>旋转角度属性（属性面板可编辑）。</summary>
     public FloatPropValue Rotation { get; }
 
-    /// <summary>Gets or sets the X scale property (negative flips X, editable).</summary>
+    /// <summary>X 缩放属性（负值翻转 X，属性面板可编辑）。</summary>
     public FloatPropValue ScaleX { get; }
 
-    /// <summary>Gets or sets the Y scale property (negative flips Y, editable).</summary>
+    /// <summary>Y 缩放属性（负值翻转 Y，属性面板可编辑）。</summary>
     public FloatPropValue ScaleY { get; }
 
     /// <summary>
-    /// Gets the transform applied to children (container space → parent
-    /// space). The properties are the source of truth; the matrix is the
-    /// TRS composition, so panel edits take effect immediately.
+    /// 施加于子图元的变换（容器空间 → 父空间）。属性是真源，矩阵是 TRS 组合，面板编辑即时生效。
     /// </summary>
     public Transform LocalTransform
     {
         get
         {
-            // Floor the scale away from zero: a zero or near-zero scale makes
-            // the transform singular, so Transform.Invert() throws and crashes
-            // child drag/resize. The property panel may still hold the raw
-            // value; the effective transform is always invertible.
+            // 将缩放钳位远离零：零或近零缩放使变换奇异，Transform.Invert() 会抛异常导致子图元拖拽/缩放崩溃。
+            // 属性面板仍保留原始值；生效的变换始终可逆。
             return Transform.Translate(OffsetX.Value, OffsetY.Value)
                 .Multiply(Transform.Rotate(Rotation.Value))
                 .Multiply(Transform.Scale(ClampScale(ScaleX.Value), ClampScale(ScaleY.Value)));
         }
     }
 
-    /// <summary>Floors a scale magnitude so the local transform stays invertible.</summary>
+    /// <summary>钳位缩放幅值，保证局部变换可逆。</summary>
     private static float ClampScale(float value)
         => value >= 0f
             ? MathF.Max(value, MinScaleMagnitude)
@@ -106,22 +94,22 @@ public sealed class Container : Primitive
 
     private const float MinScaleMagnitude = 0.01f;
 
-    /// <summary>Gets the child primitives in render order (first = bottom).</summary>
+    /// <summary>子图元列表（按渲染顺序，首个在最底层）。</summary>
     public IReadOnlyList<Primitive> Children => _children;
 
-    /// <summary>Creates a container that offsets its children.</summary>
+    /// <summary>创建偏移容器。</summary>
     public static Container CreateOffset(string name, float offsetX, float offsetY)
         => new(name, ContainerKind.Offset, offsetX, offsetY, 0f, 1f, 1f);
 
-    /// <summary>Creates a container that rotates its children (degrees).</summary>
+    /// <summary>创建旋转容器（角度制）。</summary>
     public static Container CreateRotation(string name, float degrees)
         => new(name, ContainerKind.Rotation, 0f, 0f, degrees, 1f, 1f);
 
-    /// <summary>Creates a container that mirrors its children on the given axes.</summary>
+    /// <summary>创建翻转容器，沿指定轴镜像。</summary>
     public static Container CreateFlip(string name, bool flipX, bool flipY)
         => new(name, ContainerKind.Flip, 0f, 0f, 0f, flipX ? -1f : 1f, flipY ? -1f : 1f);
 
-    /// <summary>Adds a child, re-parenting it into this container's local space.</summary>
+    /// <summary>添加子图元，将其重新关联到本容器的局部空间。</summary>
     public void AddChild(Primitive child)
     {
         if (child.Parent is not null)
@@ -133,7 +121,7 @@ public sealed class Container : Primitive
         _children.Add(child);
     }
 
-    /// <summary>Removes a child, detaching it to the root level.</summary>
+    /// <summary>移除子图元，将其脱离到根级别。</summary>
     public void RemoveChild(Primitive child)
     {
         if (_children.Remove(child))
@@ -142,15 +130,15 @@ public sealed class Container : Primitive
         }
     }
 
-    /// <summary>Transforms a bounds from this container's space to its parent's space.</summary>
+    /// <summary>将包围盒从本容器空间变换到父空间。</summary>
     public Box TransformBoundsToParent(Box local)
         => TransformBox(local, LocalTransform);
 
-    /// <summary>Transforms a bounds from parent space into this container's space.</summary>
+    /// <summary>将包围盒从父空间变换到本容器空间。</summary>
     public Box ToLocalBounds(Box parent)
         => TransformBox(parent, LocalTransform.Invert());
 
-    /// <summary>Transforms a bounds from this container's space to world space.</summary>
+    /// <summary>将包围盒从本容器空间变换到世界空间。</summary>
     public Box ToWorldBounds(Box local)
     {
         var box = local;
@@ -165,7 +153,7 @@ public sealed class Container : Primitive
         return box;
     }
 
-    /// <summary>Converts a world-space delta into a delta in this container's space.</summary>
+    /// <summary>将世界空间增量转换为本容器空间的增量。</summary>
     public Point ToLocalVector(float worldDx, float worldDy)
     {
         var vector = Parent is Container parent
@@ -174,7 +162,7 @@ public sealed class Container : Primitive
         return LocalTransform.Invert().ApplyToVector(vector.X, vector.Y);
     }
 
-    /// <summary>Converts a world-space point into this container's space.</summary>
+    /// <summary>将世界空间点转换为本容器空间的点。</summary>
     public Point ToLocalPoint(Point world)
     {
         var point = Parent is Container parent ? parent.ToLocalPoint(world) : world;
@@ -184,8 +172,7 @@ public sealed class Container : Primitive
     /// <inheritdoc/>
     protected override Box GetLocalBoundingBox()
     {
-        // Children live in this container's space; applying the local
-        // transform yields the content's extent in that space.
+        // 子图元在本容器空间中；施加局部变换得到该空间中的内容范围
         return TransformBox(UnionChildrenBounds(), LocalTransform);
     }
 
@@ -205,16 +192,14 @@ public sealed class Container : Primitive
 
         if (!LocalTransform.IsAxisAligned)
         {
-            // Rotated/flipped containers scale uniformly to avoid injecting
-            // shear into the matrix.
+            // 旋转/翻转容器采用等比缩放，避免向矩阵注入剪切
             float uniform = MathF.Min(MathF.Abs(scaleX), MathF.Abs(scaleY));
             scaleX = MathF.Sign(scaleX) * uniform;
             scaleY = MathF.Sign(scaleY) * uniform;
         }
 
-        // Scaling happens around the origin; translate so the anchor point
-        // (the resize gesture's fixed corner) stays put. With the TRS model:
-        // Scale(s) ∘ Translate(t) = Translate(t·s) ∘ Scale(s).
+        // 缩放绕原点进行；平移使锚点（缩放手势的固定角）保持不动。
+        // TRS 模型下：Scale(s) ∘ Translate(t) = Translate(t·s) ∘ Scale(s)
         float deltaX = anchor.X - anchor.X * scaleX;
         float deltaY = anchor.Y - anchor.Y * scaleY;
         OffsetX.Value = deltaX + OffsetX.Value * scaleX;
@@ -227,7 +212,6 @@ public sealed class Container : Primitive
     /// <inheritdoc/>
     protected override bool ContainsLocalPoint(Point point)
     {
-        // Children share this container's space.
         foreach (var child in _children)
         {
             if (child.ContainsParentLocalPoint(point))

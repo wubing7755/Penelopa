@@ -1,8 +1,7 @@
 namespace Penelopa.Core.Alignment;
 
 /// <summary>
-/// The six supported alignment directions relative to the union of the
-/// selected items' bounding boxes.
+/// 六种对齐方向，参考值为选中项包围盒的并集。
 /// </summary>
 public enum AlignType
 {
