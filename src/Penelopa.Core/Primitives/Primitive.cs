@@ -15,13 +15,9 @@ public abstract class Primitive : IAlignable
 
         Name = new StringPropValue("Name", name);
         AddProp(Name);
-        ColorKey = new UintPropValue("ColorKey", ColorKeyManager.GenerateColorKey(this));
-        AddProp(ColorKey);
     }
 
-    public Guid Id { get; }
-
-    public UintPropValue ColorKey { get; }
+    public Guid Id { get; internal set; }
 
     public StringPropValue Name { get; }
 
@@ -32,26 +28,116 @@ public abstract class Primitive : IAlignable
         Props.Add(propValue);
     }
 
-    /// <inheritdoc/>
-    public abstract Box GetWorldBoundingBox();
+    /// <summary>Gets the parent container, or null for root primitives.</summary>
+    public Primitive? Parent { get; internal set; }
 
-    /// <summary>Translates the primitive by a delta.</summary>
-    public abstract void Translate(float deltaX, float deltaY);
-
-    /// <inheritdoc/>
-    public Transform GetWorldTransform()
+    /// <summary>Gets the world-space axis-aligned bounding box.</summary>
+    /// <remarks>Leaf primitives report their local bounds; the base class
+    /// maps them through the parent container chain to world space.</remarks>
+    public Box GetWorldBoundingBox()
     {
-        var currentPos = GetCurrentPosition();
-        return Transform.Translate(currentPos.X, currentPos.Y);
+        var box = GetLocalBoundingBox();
+        for (var node = Parent; node is not null; node = node.Parent)
+        {
+            if (node is Container container)
+            {
+                box = container.TransformBoundsToParent(box);
+            }
+        }
+
+        return box;
     }
 
+    /// <summary>
+    /// Gets the primitive's bounding box in its own (parent-relative) space.
+    /// </summary>
+    protected abstract Box GetLocalBoundingBox();
+
+    /// <summary>Internal bridge for containers to query a child's local bounds.</summary>
+    internal Box GetParentLocalBoundingBox() => GetLocalBoundingBox();
+
+    /// <summary>
+    /// Translates the primitive by a world-space delta. Container children
+    /// convert the delta through the parent chain so the movement follows
+    /// the pointer even inside rotated containers.
+    /// </summary>
+    public void Translate(float deltaX, float deltaY)
+    {
+        if (Parent is Container container)
+        {
+            var local = container.ToLocalVector(deltaX, deltaY);
+            TranslateLocal(local.X, local.Y);
+        }
+        else
+        {
+            TranslateLocal(deltaX, deltaY);
+        }
+    }
+
+    /// <summary>Moves the primitive by a delta in its local space.</summary>
+    protected abstract void TranslateLocal(float deltaX, float deltaY);
+
+    /// <summary>
+    /// Fits the primitive's geometry into the given world-space bounding box.
+    /// </summary>
+    /// <param name="bounds">The target world-space axis-aligned bounds.</param>
+    /// <param name="anchor">The fixed corner of a resize gesture. Shapes that
+    /// re-center themselves (such as a circle) keep this point on their
+    /// boundary so the opposite corner follows the pointer; shapes that fill
+    /// the box directly ignore it.</param>
+    /// <returns>The actual fitted bounds in world space. Shapes that preserve
+    /// an aspect ratio (such as a circle) may not fill the target exactly, so
+    /// callers must use the returned box to correct the selection overlay.</returns>
+    public Box SetBounds(Box bounds, Point anchor)
+    {
+        if (Parent is Container container)
+        {
+            var localBounds = container.ToLocalBounds(bounds);
+            var localAnchor = container.ToLocalPoint(anchor);
+            return container.ToWorldBounds(SetBoundsLocal(localBounds, localAnchor));
+        }
+
+        return SetBoundsLocal(bounds, anchor);
+    }
+
+    /// <summary>Fits the primitive's geometry into a bounds in its local space.</summary>
+    protected abstract Box SetBoundsLocal(Box bounds, Point anchor);
+
+    /// <summary>
+    /// Returns whether the given world point lies inside the primitive's
+    /// shape. Used by hit-through candidate collection and marquee tests.
+    /// </summary>
+    public bool ContainsWorldPoint(Point point)
+    {
+        // A container maps the world point through its own (and its
+        // ancestors') inverse transform; a leaf maps through its parent chain.
+        if (this is Container self)
+        {
+            return ContainsLocalPoint(self.ToLocalPoint(point));
+        }
+
+        if (Parent is Container parent)
+        {
+            return ContainsLocalPoint(parent.ToLocalPoint(point));
+        }
+
+        return ContainsLocalPoint(point);
+    }
+
+    /// <summary>Tests a point in the primitive's local space against its shape.</summary>
+    protected abstract bool ContainsLocalPoint(Point point);
+
+    /// <summary>Internal bridge for containers to test a child's local shape.</summary>
+    internal bool ContainsParentLocalPoint(Point point) => ContainsLocalPoint(point);
+
     /// <inheritdoc/>
-    public void SetWorldTransform(Transform transform)
+    public Point GetWorldPosition() => GetCurrentPosition();
+
+    /// <inheritdoc/>
+    public void SetWorldPosition(Point position)
     {
         var currentPos = GetCurrentPosition();
-        var deltaX = transform.Tx - currentPos.X;
-        var deltaY = transform.Ty - currentPos.Y;
-        Translate(deltaX, deltaY);
+        Translate(position.X - currentPos.X, position.Y - currentPos.Y);
     }
 
     /// <summary>
@@ -88,7 +174,7 @@ public class Circle : Primitive
     public FloatPropValue Radius { get; }
     public UintPropValue Color { get; }
 
-    public override Box GetWorldBoundingBox()
+    protected override Box GetLocalBoundingBox()
     {
         float left = CenterX.Value - Radius.Value;
         float top = CenterY.Value - Radius.Value;
@@ -97,10 +183,35 @@ public class Circle : Primitive
         return new Box(left, top, right, bottom);
     }
 
-    public override void Translate(float deltaX, float deltaY)
+    protected override void TranslateLocal(float deltaX, float deltaY)
     {
         CenterX.Value += deltaX;
         CenterY.Value += deltaY;
+    }
+
+    protected override Box SetBoundsLocal(Box bounds, Point anchor)
+    {
+        // A circle keeps its aspect. The anchor is the resize gesture's
+        // fixed corner and stays on the circle: the center is derived from
+        // the anchor plus the inscribed radius, so the circle grows from the
+        // fixed corner instead of re-centering in the target box.
+        float radius = MathF.Max(0f, MathF.Min(bounds.Width, bounds.Height) * 0.5f);
+
+        const float eps = 1e-4f;
+        float centerX = anchor.X <= bounds.MinX + eps ? bounds.MinX + radius : bounds.MaxX - radius;
+        float centerY = anchor.Y <= bounds.MinY + eps ? bounds.MinY + radius : bounds.MaxY - radius;
+
+        CenterX.Value = centerX;
+        CenterY.Value = centerY;
+        Radius.Value = radius;
+        return GetWorldBoundingBox();
+    }
+
+    protected override bool ContainsLocalPoint(Point point)
+    {
+        float dx = point.X - CenterX.Value;
+        float dy = point.Y - CenterY.Value;
+        return dx * dx + dy * dy <= Radius.Value * Radius.Value;
     }
 }
 
@@ -130,7 +241,7 @@ public class Rectangle : Primitive
     public FloatPropValue Height { get; }
     public UintPropValue Color { get; }
 
-    public override Box GetWorldBoundingBox()
+    protected override Box GetLocalBoundingBox()
     {
         float left = PosX.Value;
         float top = PosY.Value;
@@ -139,10 +250,26 @@ public class Rectangle : Primitive
         return new Box(left, top, right, bottom);
     }
 
-    public override void Translate(float deltaX, float deltaY)
+    protected override void TranslateLocal(float deltaX, float deltaY)
     {
         PosX.Value += deltaX;
         PosY.Value += deltaY;
+    }
+
+    protected override Box SetBoundsLocal(Box bounds, Point anchor)
+    {
+        PosX.Value = bounds.MinX;
+        PosY.Value = bounds.MinY;
+        Width.Value = bounds.Width;
+        Height.Value = bounds.Height;
+        return bounds;
+    }
+
+    protected override bool ContainsLocalPoint(Point point)
+    {
+        var box = GetLocalBoundingBox();
+        return point.X >= box.MinX && point.X <= box.MaxX
+            && point.Y >= box.MinY && point.Y <= box.MaxY;
     }
 }
 
@@ -178,19 +305,59 @@ public class Triangle : Primitive
     public FloatPropValue Vertex3Y { get; }
     public UintPropValue Color { get; }
 
-    public override Box GetWorldBoundingBox()
+    protected override Box GetLocalBoundingBox()
     {
-        float minX = Math.Min(Math.Min(Vertex1X.Value, Vertex2X.Value), Vertex3X.Value);
-        float maxX = Math.Max(Math.Max(Vertex1X.Value, Vertex2X.Value), Vertex3X.Value);
-        float minY = Math.Min(Math.Min(Vertex1Y.Value, Vertex2Y.Value), Vertex3Y.Value);
-        float maxY = Math.Max(Math.Max(Vertex1Y.Value, Vertex2Y.Value), Vertex3Y.Value);
+        float minX = MathF.Min(Vertex1X.Value, MathF.Min(Vertex2X.Value, Vertex3X.Value));
+        float minY = MathF.Min(Vertex1Y.Value, MathF.Min(Vertex2Y.Value, Vertex3Y.Value));
+        float maxX = MathF.Max(Vertex1X.Value, MathF.Max(Vertex2X.Value, Vertex3X.Value));
+        float maxY = MathF.Max(Vertex1Y.Value, MathF.Max(Vertex2Y.Value, Vertex3Y.Value));
         return new Box(minX, minY, maxX, maxY);
     }
 
-    public override void Translate(float deltaX, float deltaY)
+    protected override void TranslateLocal(float deltaX, float deltaY)
     {
         Vertex1X.Value += deltaX; Vertex1Y.Value += deltaY;
         Vertex2X.Value += deltaX; Vertex2Y.Value += deltaY;
         Vertex3X.Value += deltaX; Vertex3Y.Value += deltaY;
     }
+
+    protected override Box SetBoundsLocal(Box bounds, Point anchor)
+    {
+        // Map the vertices by their normalized position inside the current
+        // bounds, so the triangle's shape is preserved while filling the
+        // target box exactly. The anchor is implicit in the box's corners.
+        var current = GetWorldBoundingBox();
+        float scaleX = current.Width > 1e-6f ? bounds.Width / current.Width : 0f;
+        float scaleY = current.Height > 1e-6f ? bounds.Height / current.Height : 0f;
+
+        Vertex1X.Value = bounds.MinX + (Vertex1X.Value - current.MinX) * scaleX;
+        Vertex1Y.Value = bounds.MinY + (Vertex1Y.Value - current.MinY) * scaleY;
+        Vertex2X.Value = bounds.MinX + (Vertex2X.Value - current.MinX) * scaleX;
+        Vertex2Y.Value = bounds.MinY + (Vertex2Y.Value - current.MinY) * scaleY;
+        Vertex3X.Value = bounds.MinX + (Vertex3X.Value - current.MinX) * scaleX;
+        Vertex3Y.Value = bounds.MinY + (Vertex3Y.Value - current.MinY) * scaleY;
+        return GetWorldBoundingBox();
+    }
+
+    protected override bool ContainsLocalPoint(Point point)
+    {
+        var box = GetLocalBoundingBox();
+        if (box.Width < 1e-6f || box.Height < 1e-6f)
+        {
+            // Degenerate (zero-area) triangles are not hittable.
+            return false;
+        }
+
+        // Cross-product sign test: the point is inside (or on the boundary)
+        // when all three edge tests share a sign.
+        float d1 = Cross(point, new Point(Vertex1X.Value, Vertex1Y.Value), new Point(Vertex2X.Value, Vertex2Y.Value));
+        float d2 = Cross(point, new Point(Vertex2X.Value, Vertex2Y.Value), new Point(Vertex3X.Value, Vertex3Y.Value));
+        float d3 = Cross(point, new Point(Vertex3X.Value, Vertex3Y.Value), new Point(Vertex1X.Value, Vertex1Y.Value));
+        bool hasNegative = d1 < 0f || d2 < 0f || d3 < 0f;
+        bool hasPositive = d1 > 0f || d2 > 0f || d3 > 0f;
+        return !(hasNegative && hasPositive);
+    }
+
+    private static float Cross(Point p, Point a, Point b)
+        => (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
 }

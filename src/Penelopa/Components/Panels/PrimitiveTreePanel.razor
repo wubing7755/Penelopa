@@ -1,5 +1,6 @@
 @namespace Penelopa.Components
 @using Atlas.Blazor.Content
+@using Microsoft.AspNetCore.Components.Rendering
 @using Penelopa.Core.Primitives
 @using Penelopa.Core.Services
 @inherits AtlasContentComponent
@@ -15,13 +16,7 @@
         <ul class="penelopa-tree-list">
             @foreach (var primitive in _primitives)
             {
-                <li>
-                    <button type="button"
-                            class="penelopa-tree-item @(IsSelected(primitive) ? "selected" : "")"
-                            @onclick="() => Select(primitive)">
-                        @primitive.Name.Value
-                    </button>
-                </li>
+                @RenderNode(primitive, 0)
             }
         </ul>
     }
@@ -37,11 +32,18 @@
     {
         base.OnInitialized();
         PrimitiveService.OnChange += HandleChange;
+        PrimitiveService.OnCollectionChanged += HandleCollectionChanged;
         PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
         RefreshList();
     }
 
     private void HandleChange(Primitive primitive)
+    {
+        RefreshList();
+        StateHasChanged();
+    }
+
+    private void HandleCollectionChanged()
     {
         RefreshList();
         StateHasChanged();
@@ -66,9 +68,31 @@
         PrimitiveService.SetSelected(primitive);
     }
 
+    private RenderFragment RenderNode(Primitive node, int depth) => __builder =>
+    {
+        <li>
+            <button type="button"
+                    class="penelopa-tree-item @(IsSelected(node) ? "selected" : "")"
+                    style="padding-left: @(12 + depth * 16)px"
+                    @onclick="() => Select(node)">
+                @node.Name.Value
+            </button>
+        </li>
+        if (node is Container container && container.Children.Count > 0)
+        {
+            <ul class="penelopa-tree-children">
+                @foreach (var child in container.Children)
+                {
+                    @RenderNode(child, depth + 1)
+                }
+            </ul>
+        }
+    };
+
     public void Dispose()
     {
         PrimitiveService.OnChange -= HandleChange;
+        PrimitiveService.OnCollectionChanged -= HandleCollectionChanged;
         PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
     }
 }

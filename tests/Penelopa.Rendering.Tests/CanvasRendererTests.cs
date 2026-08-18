@@ -8,17 +8,17 @@ namespace Penelopa.Rendering.Tests;
 public class CanvasRendererTests
 {
     private const int CanvasSize = 512;
+    private const float Center = CanvasSize / 2f;
 
     [Fact]
     public void HitTest_AtCircleScreenPosition_ReturnsThatCircle()
     {
         var renderer = new CanvasRenderer();
-        // World center (20,20) renders at screen pixel (20, 512-20) after the
-        // y-flip (origin at bottom-left, y grows up).
+        // World (20,20) renders at the canvas center offset: (256+20, 256-20).
         var circle = new Circle { CenterX = { Value = 20f }, CenterY = { Value = 20f }, Radius = { Value = 10f } };
 
         renderer.Render(NewSurface(), NewInfo(), 1f, new Primitive[] { circle });
-        var hit = renderer.HitTest(20f, CanvasSize - 20f);
+        var hit = renderer.HitTest(Center + 20f, Center - 20f);
 
         Assert.Same(circle, hit);
     }
@@ -30,7 +30,7 @@ public class CanvasRendererTests
         var circle = new Circle { CenterX = { Value = 20f }, CenterY = { Value = 20f }, Radius = { Value = 10f } };
 
         renderer.Render(NewSurface(), NewInfo(), 1f, new Primitive[] { circle });
-        // Screen pixel (20,20) corresponds to world (20, 492), outside the circle.
+        // CSS (20,20) maps to world (20-256, 256-20) = (-236, 236), outside.
         var hit = renderer.HitTest(20f, 20f);
 
         Assert.Null(hit);
@@ -57,7 +57,7 @@ public class CanvasRendererTests
 
         // Later primitives paint over earlier ones, so the circle wins at its center.
         renderer.Render(NewSurface(), NewInfo(), 1f, new Primitive[] { bottom, top });
-        var hit = renderer.HitTest(25f, CanvasSize - 25f);
+        var hit = renderer.HitTest(Center + 25f, Center - 25f);
 
         Assert.Same(top, hit);
     }
@@ -71,7 +71,7 @@ public class CanvasRendererTests
 
         renderer.Render(NewSurface(), NewInfo(), 1f, new Primitive[] { bottom, top });
         // Inside the rectangle but outside the circle (radius 10): bottom wins.
-        var hit = renderer.HitTest(10f, CanvasSize - 10f);
+        var hit = renderer.HitTest(Center + 10f, Center - 10f);
 
         Assert.Same(bottom, hit);
     }
@@ -101,15 +101,15 @@ public class CanvasRendererTests
         var canvas = new SKCanvas(bitmap);
         renderer.Render(canvas, new SKImageInfo(physicalSize, physicalSize), 2f, new Primitive[] { circle });
 
-        // World (20,20) -> view pixel (40, 1024-40) -> CSS (20, 512-20).
-        var hit = renderer.HitTest(20f, CanvasSize - 20f);
+        // World (20,20) -> view pixel (512+40, 512-40) -> CSS (276, 236).
+        var hit = renderer.HitTest(Center + 20f, Center - 20f);
         Assert.Same(circle, hit);
 
-        // CSS top-left (20,20) maps to world (20,492): outside the circle.
+        // CSS top-left (20,20) maps to world (-236,236): outside the circle.
         Assert.Null(renderer.HitTest(20f, 20f));
 
-        // The visible color is painted at the physical pixel (40, 984).
-        var rendered = bitmap.GetPixel(40, physicalSize - 40);
+        // The visible color is painted at the physical pixel (552, 472).
+        var rendered = bitmap.GetPixel(physicalSize / 2 + 40, physicalSize / 2 - 40);
         Assert.Equal(0xFFFFFFFFu, (uint)rendered);
     }
 

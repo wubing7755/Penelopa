@@ -1,5 +1,6 @@
 @namespace Penelopa.Components
 @using Atlas.Blazor.Content
+@using Microsoft.JSInterop
 @using Penelopa.Core.Alignment
 @using Penelopa.Core.Primitives
 @using Penelopa.Core.Services
@@ -15,6 +16,25 @@
             <button type="button" class="penelopa-tool-button" @onclick="() => Add(() => new Rectangle())">Rectangle</button>
             <button type="button" class="penelopa-tool-button" @onclick="() => Add(() => new Triangle())">Triangle</button>
         </div>
+        <p class="penelopa-tool-hint">Adds into the selected container when one is selected.</p>
+    </div>
+
+    <div class="penelopa-tool-section">
+        <span class="penelopa-tool-label">Container</span>
+        <div class="penelopa-tool-actions">
+            <button type="button" class="penelopa-tool-button" @onclick="AddOffsetContainer">Offset</button>
+            <button type="button" class="penelopa-tool-button" @onclick="AddRotationContainer">Rotate</button>
+            <button type="button" class="penelopa-tool-button" @onclick="AddFlipContainer">Flip</button>
+        </div>
+    </div>
+
+    <div class="penelopa-tool-section">
+        <span class="penelopa-tool-label">Document</span>
+        <div class="penelopa-tool-actions">
+            <button type="button" class="penelopa-tool-button" @onclick="SaveDocument">Save</button>
+            <button type="button" class="penelopa-tool-button" @onclick="LoadDocument">Load</button>
+        </div>
+        <p class="penelopa-tool-hint">Stores the document in this browser (localStorage).</p>
     </div>
 
     <div class="penelopa-tool-section">
@@ -31,17 +51,99 @@
 </div>
 
 @code {
+    private const string StorageKey = "penelopa.document";
+
     [Inject]
     private IPrimitiveService PrimitiveService { get; set; } = null!;
 
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
+
     private void Add(Func<Primitive> factory)
     {
-        PrimitiveService.Add(factory());
+        var primitive = factory();
+        var selection = PrimitiveService.GetSelection().ToList();
+        var container = selection.Count == 1 ? selection[0] as Container : null;
+        if (container is not null)
+        {
+            PrimitiveService.AddToContainer(container, primitive);
+        }
+        else
+        {
+            PrimitiveService.Add(primitive);
+        }
     }
+
+    private void AddContainer(Container container)
+    {
+        PrimitiveService.Add(container);
+        PrimitiveService.SetSelected(container);
+    }
+
+    private void AddOffsetContainer()
+        => AddContainer(Container.CreateOffset("Offset Container", 20f, 20f));
+
+    private void AddRotationContainer()
+        => AddContainer(Container.CreateRotation("Rotate Container", 45f));
+
+    private void AddFlipContainer()
+        => AddContainer(Container.CreateFlip("Flip Container", flipX: true, flipY: false));
 
     private void Align(AlignType type)
     {
         var selection = PrimitiveService.GetSelection();
         AlignExtensions.Align<Primitive>(selection, type);
+        PrimitiveService.NotifyPrimitivesChanged(selection);
+    }
+
+    private async Task SaveDocument()
+    {
+        var json = DocumentSerializer.Serialize(
+            PrimitiveService.GetAll().ToList(),
+            PrimitiveService.GetSelection().ToList());
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+    }
+
+    private async Task LoadDocument()
+    {
+        var json = await JS.InvokeAsync<string>("localStorage.getItem", StorageKey);
+        if (string.IsNullOrEmpty(json))
+        {
+            return;
+        }
+
+        var result = DocumentSerializer.Deserialize(json);
+        if (result is null)
+        {
+            return;
+        }
+
+        PrimitiveService.ReplaceAll(result.Roots);
+
+        // Re-resolve the selection against the rebuilt tree by id.
+        var all = new List<Primitive>();
+        foreach (var root in result.Roots)
+        {
+            Collect(root, all);
+        }
+
+        var byId = all.ToDictionary(p => p.Id);
+        var selected = result.SelectionIds.Where(id => byId.ContainsKey(id)).Select(id => byId[id]).ToList();
+        if (selected.Count > 0)
+        {
+            PrimitiveService.SetSelectedRange(selected);
+        }
+    }
+
+    private static void Collect(Primitive node, List<Primitive> all)
+    {
+        all.Add(node);
+        if (node is Container container)
+        {
+            foreach (var child in container.Children)
+            {
+                Collect(child, all);
+            }
+        }
     }
 }

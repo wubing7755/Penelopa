@@ -399,6 +399,18 @@ h1:focus {
     border-color: var(--penelopa-accent);
 }
 
+.penelopa-tree-children {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 0.5rem;
+}
+
+.penelopa-tool-hint {
+    margin: 0.25rem 0 0;
+    font-size: 0.75rem;
+    color: var(--penelopa-muted);
+}
+
 .penelopa-tree-empty,
 .penelopa-properties-empty {
     color: var(--penelopa-muted);
@@ -449,17 +461,44 @@ h1:focus {
     overflow: auto;
 }
 
+/* While a pointer drag is active, the browser must not hijack the gesture
+   for touch scrolling; the class is toggled from the pointer layer. */
+.penelopa-canvas-scroll.penelopa-dragging,
+.penelopa-canvas.penelopa-dragging {
+    touch-action: none;
+}
+
 /* The canvas keeps a minimum content size so shrinking the window shows
    scrollbars instead of clipping the drawing area. The SKGLView inside
    fills this content box; browser pointer events report OffsetX/Y relative
    to that element, so hit testing is unaffected by scroll position. */
 .penelopa-canvas {
-    width: max(100%, var(--penelopa-canvas-min-width, 1600px));
-    height: max(100%, var(--penelopa-canvas-min-height, 1200px));
+    width: 100%;
+    height: 100%;
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
     background: var(--penelopa-surface);
+    position: relative;
+}
+
+.penelopa-canvas-fit {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 10;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--penelopa-border);
+    border-radius: 4px;
+    background: var(--penelopa-surface);
+    color: var(--penelopa-ink);
+    cursor: pointer;
+    opacity: 0.85;
+}
+
+.penelopa-canvas-fit:hover {
+    background: var(--penelopa-hover);
+    opacity: 1;
 }
 
 .penelopa-canvas canvas {

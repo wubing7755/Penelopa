@@ -50,6 +50,7 @@
     {
         base.OnInitialized();
         PrimitiveService.OnSelectionChanged += HandleSelectionChanged;
+        PrimitiveService.OnPrimitiveChanged += HandlePrimitiveChanged;
     }
 
     private void HandleSelectionChanged(IEnumerable<Primitive> primitives)
@@ -58,8 +59,15 @@
         StateHasChanged();
     }
 
+    private void HandlePrimitiveChanged(IEnumerable<Primitive> primitives)
+    {
+        // The referenced PropValues already changed; re-render to show them.
+        StateHasChanged();
+    }
+
     public void Dispose()
     {
         PrimitiveService.OnSelectionChanged -= HandleSelectionChanged;
+        PrimitiveService.OnPrimitiveChanged -= HandlePrimitiveChanged;
     }
 }

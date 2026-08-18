@@ -27,7 +27,7 @@ public static class AlignExtensions
 
         // Capture the current state of every item.
         var boxes = list.Select(item => item.GetWorldBoundingBox()).ToList();
-        var originalTransforms = list.Select(item => item.GetWorldTransform()).ToList();
+        var originalPositions = list.Select(item => item.GetWorldPosition()).ToList();
 
         // The union of all bounding boxes is the alignment reference.
         var unionBox = MergeBoxes(boxes);
@@ -43,15 +43,11 @@ public static class AlignExtensions
         {
             var item = list[i];
             var box = boxes[i];
-            var originalTransform = originalTransforms[i];
+            var originalPosition = originalPositions[i];
 
             var (dx, dy) = CalculateOffset(box, type, unionBox);
 
-            var newTransform = Transform.Translate(
-                originalTransform.Tx + dx,
-                originalTransform.Ty + dy);
-
-            item.SetWorldTransform(newTransform);
+            item.SetWorldPosition(new Point(originalPosition.X + dx, originalPosition.Y + dy));
         }
 
         return true;

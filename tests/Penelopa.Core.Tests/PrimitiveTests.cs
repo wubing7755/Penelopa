@@ -7,15 +7,13 @@ namespace Penelopa.Core.Tests;
 public class PrimitiveTests
 {
     [Fact]
-    public void Primitive_Constructor_RegistersNameColorKeyAndProps()
+    public void Primitive_Constructor_RegistersNameAndProps()
     {
         var rect = new Rectangle();
 
         Assert.NotEqual(Guid.Empty, rect.Id);
         Assert.Equal("Rectangle", rect.Name.Value);
-        Assert.NotNull(rect.ColorKey);
         Assert.Contains(rect.Props, p => p == rect.Name);
-        Assert.Contains(rect.Props, p => p == rect.ColorKey);
         Assert.Contains(rect.Props, p => p == rect.PosX);
         Assert.Contains(rect.Props, p => p == rect.Color);
     }
@@ -113,29 +111,28 @@ public class PrimitiveTests
     }
 
     [Fact]
-    public void Primitive_SetWorldTransform_AppliesDeltaTranslation()
+    public void Primitive_SetWorldPosition_AppliesDeltaTranslation()
     {
-        // SetWorldTransform applies a delta from the current anchor (MinX, MaxY),
-        // so Translate(30,40) moves the box so MinX=30 and MaxY=40.
+        // SetWorldPosition moves the anchor (MinX, MaxY) to the given world
+        // point, so (30, 40) places the box so MinX=30 and MaxY=40.
         var rect = Rect(10f, 20f);
-        var target = Transform.Translate(30f, 40f);
 
-        rect.SetWorldTransform(target);
+        rect.SetWorldPosition(new Point(30f, 40f));
 
         Assert.Equal(30f, rect.PosX.Value);
         Assert.Equal(30f, rect.PosY.Value);
     }
 
     [Fact]
-    public void Primitive_GetWorldTransform_ReturnsCurrentAnchor()
+    public void Primitive_GetWorldPosition_ReturnsCurrentAnchor()
     {
         // The anchor is the bounding box top-left in (x, y-down): (MinX, MaxY).
         var rect = Rect(10f, 20f);
 
-        var t = rect.GetWorldTransform();
+        var p = rect.GetWorldPosition();
 
-        Assert.Equal(10f, t.Tx);
-        Assert.Equal(30f, t.Ty);
+        Assert.Equal(10f, p.X);
+        Assert.Equal(30f, p.Y);
     }
 
     private static Rectangle Rect(float x, float y, float w = 10f, float h = 10f)
